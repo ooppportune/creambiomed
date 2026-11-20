@@ -420,6 +420,14 @@ function buildQ(base,p,skip){const parts=["("+base+")"];
   if(p.all!=="1")parts.push(ACTIVE);
   return parts.join(" AND ")+(p.acc==="1"?"":EXQ)}
 
+/* ---------- equipment-wide stats (union of the 12 departments) ---------- */
+let _EQ=null;
+function deptQ(d){return "("+d.subs.map(s=>"("+s[2]+")").join(" OR ")+") AND "+ACTIVE+EXQ}
+async function eqStats(){if(_EQ)return _EQ;_EQ=(async()=>{
+  const per=await Promise.all(DEPTS.map(async d=>{const q=deptQ(d);const [c,g]=await Promise.all([fda({search:q,count:"company_name.exact",limit:1000}),fda({search:q,count:"gmdn_terms.name.exact",limit:1000})]);return{id:d.id,c:c.results||[],g:g.results||[]}}));
+  const mk=new Map(),ty=new Set();let rec=0;per.forEach(p=>{p.c.forEach(x=>{mk.set(x.term,(mk.get(x.term)||0)+x.count);rec+=x.count});p.g.forEach(x=>ty.add(x.term))});
+  return{makers:[...mk].map(([term,count])=>({term,count})).sort((a,b)=>b.count-a.count),records:rec,types:ty.size,byDept:Object.fromEntries(per.map(p=>[p.id,p.c]))}})();
+  _EQ.catch(()=>{_EQ=null});return _EQ}
 /* ---------- pages ---------- */
 async function home(){
   app.innerHTML=`<section class="hero"><div class="wrap">
@@ -458,10 +466,9 @@ async function home(){
     </div>
     <div class="band" style="margin-top:30px"><div><h2>Manufacturer or distributor?</h2><p>Add your prices, photos, brochures and local service partners to your listings.</p></div><a class="btn btn-g" href="#/list">List your products</a></div>
   </div></section>`;
-  try{const s=ACTIVE+EXQ;const [e,m,t]=await Promise.all([fda({search:s,limit:1}),fda({search:s,count:"company_name.exact",limit:1000}),fda({search:s,count:"gmdn_terms.name.exact",limit:1000})]);
-    const k=n=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?Math.round(n/1e3)+"K":n;
-    document.getElementById("st-e").textContent=k(total(e));const mm=(m.results||[]).length,tt=(t.results||[]).length;
-    document.getElementById("st-m").textContent=mm>=1000?"1,000+":fmt(mm);document.getElementById("st-t").textContent=tt>=1000?"1,000+":fmt(tt);
+  try{const E=await eqStats();const k=n=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e4?Math.round(n/1e3)+"K":fmt(n);
+    const set=(i,v)=>{const el=document.getElementById(i);if(el)el.textContent=v};
+    set("st-m",fmt(E.makers.length));set("st-e",k(E.records));set("st-t",fmt(E.types));
   }catch(x){["st-e","st-m","st-t"].forEach(i=>{const el=document.getElementById(i);if(el)el.textContent="—"})}
 }
 const feat=(i,h,p)=>`<div class="card feat"><div class="fi">${i}</div><div><h3>${h}</h3><p>${p}</p></div></div>`;
@@ -595,11 +602,10 @@ async function suppliers(){
     <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><input id="sf" class="ff" style="flex:1;min-width:220px;border:1px solid var(--line);border-radius:9px;padding:10px" placeholder="Find a manufacturer…" oninput="supFilter(this.value)">
     <select style="border:1px solid var(--line);border-radius:9px;padding:10px" onchange="go('#/suppliers'+(this.value?'?d='+this.value:''))"><option value="">All departments</option>${DEPTS.map(d=>`<option value="${d.id}" ${dsel===d.id?"selected":""}>${esc(d.name)}</option>`).join("")}</select></div></div></div>
   <div class="wrap" style="padding:20px 20px 60px"><div id="sl">${loading("Loading manufacturers…")}</div></div>`;
-  try{const q=dsel?"("+DEPT[dsel].subs.map(s=>"("+s[2]+")").join(" OR ")+") AND ":"";
-    const j=await fda({search:q+ACTIVE+EXQ,count:"company_name.exact",limit:1000});window._SUP=j.results||[];supFilter("")}catch(e){document.getElementById("sl").innerHTML=errBox(e)}
+  try{const E=await eqStats();window._SUP=dsel?E.byDept[dsel]:E.makers;supFilter("")}catch(e){document.getElementById("sl").innerHTML=errBox(e)}
 }
 function supFilter(v){const el=document.getElementById("sl");if(!el||!window._SUP)return;const L=window._SUP.filter(x=>!v||x.term.toLowerCase().includes(v.toLowerCase()));
-  el.innerHTML=`<p class="note">${fmt(L.length)}${window._SUP.length>=1000&&!v?"+":""} manufacturers</p><div class="grid g4">${L.slice(0,160).map(x=>`<a class="card sup" href="#/maker/${encodeURIComponent(x.term)}"><span class="av" style="background:${avColor(x.term)}">${esc(initials(x.term))}</span><span><b>${esc(titleCase(x.term))}</b><span>${fmt(x.count)} equipment records</span></span></a>`).join("")}</div>${L.length>160?`<p class="note center" style="margin-top:14px">Showing the top 160. Type a name to find others.</p>`:""}`}
+  el.innerHTML=`<p class="note">${fmt(L.length)} manufacturers</p><div class="grid g4">${L.slice(0,160).map(x=>`<a class="card sup" href="#/maker/${encodeURIComponent(x.term)}"><span class="av" style="background:${avColor(x.term)}">${esc(initials(x.term))}</span><span><b>${esc(titleCase(x.term))}</b><span>${fmt(x.count)} equipment records</span></span></a>`).join("")}</div>${L.length>160?`<p class="note center" style="margin-top:14px">Showing the top 160. Type a name to find others.</p>`:""}`}
 
 function planner(id){
   if(!id){app.innerHTML=`<div class="ph"><div class="wrap"><div class="crumbs"><a href="#/">Home</a> / Facility planner</div><h1>Facility planner</h1><p class="desc">Equipping a new unit or upgrading an old one? Pick the facility type to see essential equipment, compare options for each item, and send one quotation request for everything.</p></div></div>
