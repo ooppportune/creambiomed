@@ -112,21 +112,40 @@ RW_URLS = [
 ]
 
 
+def parse_rw_text(text):
+    """Fallback parser for Rwanda FDA list PDFs when table extraction fails.
+    Keeps only the company name, district/sector and licence expiry (no personal names)."""
+    rows = []
+    t = re.sub(r"[ \t]+", " ", text)
+    pat = re.compile(r"(?:^|\n)\s*(\d{1,3})\.\s+(.+?)\s+MEDICAL\s*\n?\s*(?:DEVICES|PRODUCTS)(.*?)(\d{2}/\d{2}/\d{4})", re.S)
+    for m in pat.finditer(t):
+        name = re.sub(r"\s+", " ", m.group(2)).strip(" ,")
+        mid = re.sub(r"\s+", " ", m.group(3))
+        loc = re.search(r"(KIGALI CITY|NORTHERN|SOUTHERN|EASTERN|WESTERN)\s+([A-Z]+)\s+([A-Z]+)", mid)
+        place = f"{loc.group(2)}, {loc.group(3)}".title() if loc else ""
+        if 2 < len(name) < 120:
+            rows.append([name.title(), "Licensed medical device wholesaler", place, "", "Rwanda FDA", "Licence valid to " + m.group(4)])
+    return rows
+
+
 def sync_rwanda(partners):
     try:
         import io, pdfplumber
     except ImportError:
-        print("pdfplumber missing; skipping Rwanda")
-        return {}
+        return {"rw_error": "pdfplumber missing"}
+    errors = []
     for url in RW_URLS:
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=90) as r:
-                pdf = pdfplumber.open(io.BytesIO(r.read()))
+            req = urllib.request.Request(url, headers={**UA, "Accept": "application/pdf,*/*"})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                data = r.read()
+            pdf = pdfplumber.open(io.BytesIO(data))
         except Exception as e:
-            print("Rwanda fetch failed:", e)
+            errors.append(f"fetch: {e}")
             continue
-        rows = []
+        rows, text = [], []
         for page in pdf.pages:
+            text.append(page.extract_text() or "")
             for table in page.extract_tables() or []:
                 for row in table:
                     cells = [re.sub(r"\s+", " ", (c or "")).strip() for c in row]
@@ -134,15 +153,22 @@ def sync_rwanda(partners):
                         continue
                     name = cells[1] if len(cells) > 1 else ""
                     expiry = next((c for c in reversed(cells) if re.match(r"\d{2}/\d{2}/\d{4}$", c)), "")
-                    # columns: SN, institution, category, technician, council no, province, district, sector, [cell], expiry
                     place = ", ".join(c for c in cells[6:8] if c and not re.match(r"\d{2}/\d{2}/\d{4}$", c)) if len(cells) > 7 else ""
                     if name:
                         rows.append([name.title(), "Licensed medical device wholesaler", place.title(), "", "Rwanda FDA", "Licence valid to " + expiry if expiry else ""])
+        if not rows:
+            rows = parse_rw_text("\n".join(text))
         if rows:
-            partners["RW"].extend(rows)
-            print(f"Rwanda: {len(rows)} licensed medical device wholesalers")
-            return {"rw_wholesalers": len(rows), "rw_source": url}
-    return {}
+            seen, uniq = set(), []
+            for r in rows:
+                if r[0].lower() not in seen:
+                    seen.add(r[0].lower()); uniq.append(r)
+            partners["RW"].extend(uniq)
+            print(f"Rwanda: {len(uniq)} licensed medical device wholesalers")
+            return {"rw_wholesalers": len(uniq)}
+        errors.append(f"parsed 0 rows from {len(data)} bytes")
+    print("Rwanda failed:", errors)
+    return {"rw_error": "; ".join(errors)[:300]}
 
 
 def main():
