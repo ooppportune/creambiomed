@@ -24,7 +24,7 @@ header.top{background:var(--dark);color:#fff;position:sticky;top:0;z-index:30}
 .nav nav{display:flex;gap:4px;align-items:center}
 .nav nav a{color:#dfe4f7;font-weight:500;font-size:14px;padding:8px 10px;border-radius:8px;white-space:nowrap}
 .nav nav a:hover,.nav nav a.active{background:rgba(255,255,255,.1);color:#fff;text-decoration:none}
-.hsearch{margin-left:auto;display:flex;align-items:center;background:#fff;border-radius:999px;padding:3px 4px 3px 14px;width:300px}
+.hsearch{margin-left:auto;display:flex;align-items:center;background:#fff;border-radius:999px;padding:3px 4px 3px 14px;width:230px}
 .hsearch input{border:0;outline:0;flex:1;min-width:0;font-size:14px;padding:6px 0}
 .hsearch button{border:0;background:var(--blue);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
 .qbtn{display:flex;align-items:center;gap:6px;color:#fff;font-weight:600;font-size:14px;padding:8px 12px;border-radius:999px;background:var(--red);white-space:nowrap}
@@ -187,9 +187,9 @@ footer .disc{border-top:1px solid rgba(255,255,255,.12);margin-top:26px;padding-
   <nav>
     <a href="#/equipment" data-r="equipment">Equipment</a>
     <a href="#/suppliers" data-r="suppliers">Manufacturers</a>
+    <a href="#/distributors" data-r="distributors">Distributors</a>
     <a href="#/planner" data-r="planner">Facility planner</a>
     <a href="#/manuals" data-r="manuals">Manuals</a>
-    <a href="#/services" data-r="services">Services</a>
     <a href="#/list" data-r="list">For suppliers</a>
   </nav>
   <form class="hsearch" id="hsearch" onsubmit="event.preventDefault();go('#/search?q='+encodeURIComponent(this.q.value))"><input name="q" placeholder="Search equipment, brand, model…"><button>Search</button></form>
@@ -205,7 +205,7 @@ footer .disc{border-top:1px solid rgba(255,255,255,.12);margin-top:26px;padding-
   <div class="cols">
     <div><h4>Cream Biomed and Scientific Limited</h4><p>A team of biomedical engineers and medical doctors helping hospitals, clinics, laboratories and individuals find, buy and maintain quality medical equipment at affordable prices.</p>
       <p><a href="https://www.facebook.com/creambiomedscientificltd" target="_blank" rel="noopener">Facebook</a> · <a href="javascript:openQuote()">Contact us</a></p></div>
-    <div><h4>Find</h4><p><a href="#/equipment">All equipment</a><br><a href="#/suppliers">Manufacturers</a><br><a href="#/planner">Facility planner</a><br><a href="#/manuals">Manuals</a></p></div>
+    <div><h4>Find</h4><p><a href="#/equipment">All equipment</a><br><a href="#/suppliers">Manufacturers</a><br><a href="#/distributors">Distributors</a><br><a href="#/planner">Facility planner</a><br><a href="#/manuals">Manuals</a></p></div>
     <div><h4>Services</h4><p><a href="#/services">Sourcing &amp; procurement</a><br><a href="#/services">Installation &amp; training</a><br><a href="#/services">Maintenance &amp; repair</a></p></div>
     <div><h4>Company</h4><p><a href="#/about">About us</a><br><a href="#/list">For suppliers</a><br><a href="#/about">About the data</a></p></div>
   </div>
@@ -357,6 +357,41 @@ async function fda(params){
   cache.set(url,p); p.catch(()=>cache.delete(url)); return p;
 }
 const total=j=>j?.meta?.results?.total||0;
+const REG="https://api.fda.gov/device/registrationlisting.json";
+async function getJSON(url){if(cache.has(url))return cache.get(url);const p=(async()=>{const r=await fetch(url);if(r.status===404)return null;if(!r.ok)throw new Error("HTTP "+r.status);return r.json()})();cache.set(url,p);p.catch(()=>cache.delete(url));return p}
+const qs=o=>Object.entries(o).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
+let CNAMES;try{CNAMES=new Intl.DisplayNames(["en"],{type:"region"})}catch(e){}
+const cname=cc=>{try{return CNAMES?CNAMES.of(cc):cc}catch(e){return cc}};
+const flag=cc=>cc&&/^[A-Za-z]{2}$/.test(cc)?String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0))):"";
+const ctry=cc=>cc?`<span title="${esc(cname(cc))}">${flag(cc)} ${esc(cname(cc))}</span>`:'<span class="note">—</span>';
+const CTRY=store.get("cb_ctry",{});
+async function makerCountry(name){if(name in CTRY)return CTRY[name];const ph=clean(name).replace(/"/g,"");
+  try{const j=await getJSON(REG+"?"+qs({search:`registration.name:"${ph}"`,count:"registration.iso_country_code",limit:3}));CTRY[name]=j?.results?.[0]?.term||"";store.set("cb_ctry",CTRY)}catch(e){return ""}return CTRY[name]}
+async function fillCountries(){const cells=[...document.querySelectorAll("[data-mc]")];const names=[...new Set(cells.map(c=>c.dataset.mc))];let i=0;
+  const work=async()=>{while(i<names.length){const n=names[i++];const cc=await makerCountry(n);cells.filter(c=>c.dataset.mc===n).forEach(c=>c.innerHTML=ctry(cc))}};
+  await Promise.all([work(),work(),work(),work(),work()])}
+const ROLE={"Manufacture Medical Device":"Manufacturer","Manufacture Medical Device for Another Party (Contract Manufacturer)":"Contract manufacturer","Export Device to the United States But Perform No Other Operation on Device":"Exporter","Develop Specifications But Do Not Manufacture At This Facility":"Specification developer","Repack or Relabel Medical Device":"Repackager / relabeller","Complaint File Establishment per 21 CFR 820.198":"Complaint handling","Sterilize Medical Device for Another Party (Contract Sterilizer)":"Contract steriliser","Remanufacture Medical Device":"Remanufacturer","Initial Importer":"Importer","Reprocess Single-Use Device":"Reprocessor"};
+async function sites(name){const ph=clean(name).replace(/"/g,"");const j=await getJSON(REG+"?"+qs({search:`registration.name:"${ph}"`,limit:100}));const m=new Map();
+  (j?.results||[]).forEach(r=>{const g=r.registration||{};const k=g.registration_number||g.fei_number||(g.name+g.city);const e=m.get(k)||{name:g.name,city:g.city,state:g.state_code,cc:g.iso_country_code,roles:new Set(),products:new Set()};(r.establishment_type||[]).forEach(t=>e.roles.add(ROLE[t]||t));(r.products||[]).forEach(pp=>pp.openfda?.device_name&&e.products.add(pp.openfda.device_name));m.set(k,e)});
+  return [...m.values()]}
+const DATA="data/";
+const LEGAL=new Set("co ltd limited inc incorporated llc gmbh ag sa sas srl spa bv nv plc corp corporation company kg ab oy as aps sl sarl pty pvt private kk se mbh the".split(" "));
+function normName(s){return String(s||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").split(" ").filter(t=>t&&!LEGAL.has(t)).join(" ")}
+const shardOf=k=>/^[a-z]/.test(k)?k[0]:"0";
+async function dataFile(p){try{return await getJSON(DATA+p)}catch(e){return null}}
+async function euMaker(name){const k=normName(name);if(!k)return{loaded:false};const sh=await dataFile("eu/mf/"+shardOf(k)+".json");if(!sh)return{loaded:false};
+  let hit=sh.rows.find(r=>normName(r[1])===k);if(!hit){const two=k.split(" ").slice(0,2).join(" ");const c=sh.rows.filter(r=>normName(r[1]).startsWith(two));if(c.length===1)hit=c[0]}
+  return{loaded:true,hit}}
+const HC="https://health-products.canada.ca/api/medical-devices/";
+const HCCLS={1:"Class I",2:"Class II",3:"Class III",4:"Class IV"};
+async function hcLookup(name){const mk=makerShort(name);const key=mk.split(" ").slice(0,2).join(" ");
+  const cs=await getJSON(HC+"company/?"+qs({lang:"en",type:"json",company_name:key}));const first=mk.split(" ")[0].toUpperCase();
+  const comps=(Array.isArray(cs)?cs:[]).filter(c=>c.company_status!=="I"&&c.company_name.toUpperCase().includes(first)).slice(0,4);
+  const lic=(await Promise.all(comps.map(c=>getJSON(HC+"licence/?"+qs({lang:"en",type:"json",company_id:c.company_id})).catch(()=>[])))).flat().filter(l=>l&&!l.end_date);
+  return{comps,lic}}
+function hcMatch(lic,d){const stop=new Set(["SYSTEM","MONITOR","PATIENT","SERIES","DEVICE","MEDICAL","UNIT","THE","AND","WITH","FOR"]);
+  const toks=[d.brand_name,d.version_or_model_number].join(" ").toUpperCase().replace(/[^A-Z0-9 ]/g," ").split(/\s+/).filter(t=>t.length>=3&&!stop.has(t));
+  return lic.filter(l=>toks.some(t=>l.licence_name.toUpperCase().replace(/[^A-Z0-9 ]/g," ").split(/\s+/).some(w=>w===t||(t.length>=4&&w.startsWith(t)))))}
 const loading=(m="Searching manufacturers…")=>`<div class="loading"><div class="spin"></div>${esc(m)}</div>`;
 const errBox=e=>`<div class="err"><p style="font-size:30px;margin:0">⚠️</p><p>${esc(e.message||e)}</p><a class="btn btn-g btn-sm" href="javascript:route()">Try again</a></div>`;
 const store={mem:{},get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):(this.mem[k]??d)}catch(e){return this.mem[k]??d}},set(k,v){this.mem[k]=v;try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -517,10 +552,11 @@ async function listing(opts){
       <span style="display:flex;gap:8px;align-items:center">${sub?`<button class="btn btn-sm btn-g" data-act="addcat" data-sub="${sub.id}">+ Ask us to recommend a ${esc(sub.name.toLowerCase().replace(/s$/,""))}</button>`:""}
       <select onchange="go(lnk({sort:this.value}))"><option value="">Sort: Relevance</option><option value="new" ${p.sort==="new"?"selected":""}>Sort: Newest listings</option></select></span></div>
       ${chips.length?`<div class="achips">${chips.map(c=>`<span class="achip">${esc(c[0])}: ${esc(c[1])} <a href="${lnk(c[2])}">×</a></span>`).join("")}</div>`:""}
-      <table class="tbl"><thead><tr><th></th><th></th><th>Product</th><th>Manufacturer</th><th>FDA class</th><th>Clearance</th><th>Status</th><th>Photos</th><th>Quote</th></tr></thead><tbody>
+      <table class="tbl"><thead><tr><th></th><th></th><th>Product</th><th>Manufacturer</th><th>Made in</th><th>FDA class</th><th>Clearance</th><th>Status</th><th>Photos</th><th>Quote</th></tr></thead><tbody>
       ${list.map(row).join("")}</tbody></table>
-      <p class="note" style="margin-top:10px">Tick ☐ to compare up to 4 devices. Similar sizes and variants of the same model are grouped. Source: U.S. FDA GUDID.</p>
+      <p class="note" style="margin-top:10px">Tick ☐ to compare up to 4 devices. Similar sizes and variants of the same model are grouped. Sources: U.S. FDA GUDID; country of manufacture from the FDA establishment register.</p>
       <div class="pager">${page>0?`<a class="btn btn-g" href="${lnk({page:page-1})}">← Previous</a>`:""}${(page+1)*PER<Math.min(tot,25000)?`<a class="btn btn-g" href="${lnk({page:page+1})}">Next →</a>`:""}</div>`;
+    fillCountries();
   }catch(e){document.getElementById("res").innerHTML=errBox(e)}
 }
 function lnk(over){const p={...qp(),...over};if(!("page" in over))delete p.page;for(const k in p)if(p[k]===""||p[k]==null)delete p[k];const path=location.hash.split("?")[0]||"#/search";return path+"?"+new URLSearchParams(p).toString()}
@@ -528,6 +564,7 @@ function row(d){const k=d.public_device_record_key,g=d.gmdn_terms?.[0]?.name;
   return `<tr><td class="c0"><input type="checkbox" data-cmp="${esc(k)}" ${CMP.includes(k)?"checked":""} title="Compare"></td><td class="c1"><div class="ti">${iconFor(d)}</div></td>
   <td><a class="pn" href="#/device/${encodeURIComponent(k)}">${esc(devName(d))}</a>${d.version_or_model_number?` <span class="note">· ${esc(d.version_or_model_number)}</span>`:""}<div class="pm">${esc(g||"")}</div></td>
   <td><a href="#/maker/${encodeURIComponent(d.company_name)}">${esc(titleCase(d.company_name))}</a></td>
+  <td data-mc="${esc(d.company_name)}">${d.company_name in CTRY?ctry(CTRY[d.company_name]):'<span class="note">…</span>'}</td>
   <td>${devClass(d)?`<span class="tag b">Class ${devClass(d)}</span>`:'<span class="note">—</span>'}</td><td>${clearance(d)}</td><td>${statusTag(d)}</td>
   <td><a class="btn btn-sm btn-g" href="${gimg(modelQ(d))}" target="_blank" rel="noopener">📷</a></td><td class="acts">${addBtn(d)}</td></tr>`}
 async function renderFilters(base,p){
@@ -571,6 +608,8 @@ async function device(key){
       <div class="card" style="margin-top:16px" id="manuals"><h3 style="margin:0 0 4px">Manuals &amp; documents</h3><p class="note" style="margin:0">Documents belong to the manufacturer and open on their original sites.</p>
         ${k510pdf(kno)?`<a class="docrow" href="${k510pdf(kno)}" target="_blank" rel="noopener"><span class="di">🏛️</span><span><b>FDA 510(k) clearance letter</b><small>Official FDA document: intended use and classification</small></span><span class="go">↗</span></a>`:""}${docLinks(mq,g?.name)}
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-r btn-sm" onclick="openQuote({title:'Request a manual',label:'Manual for ${esc(mq).replace(/'/g,"")}'})">Can't find it? Ask our engineers</button><button class="btn btn-g btn-sm" onclick="openQuote({title:'Book service or repair',label:'Service / repair: ${esc(mq).replace(/'/g,"")}'})">Book service or repair</button></div></div>
+      <div class="card" style="margin-top:16px"><h3 style="margin:0 0 10px">Market authorisations</h3><div id="auth">${loading("Checking regulators…")}</div></div>
+      <div class="card" style="margin-top:16px"><h3 style="margin:0 0 4px">Where it's made</h3><p class="note" style="margin:0 0 8px">Facilities registered with the U.S. FDA for ${esc(titleCase(d.company_name))}.</p><div id="sites">${loading("Loading facilities…")}</div></div>
       <div id="similar"></div></div>
     <aside class="side"><div class="card"><h3 style="margin:0 0 6px">Interested in this equipment?</h3><p class="note">Add it to your quote list. Our engineers contact the manufacturer or an authorised distributor, confirm availability in your country and send one consolidated quotation.</p>
       ${addBtn(d,"btn btn-r")}
@@ -578,11 +617,24 @@ async function device(key){
       <a class="btn btn-g" href="#/maker/${encodeURIComponent(d.company_name)}">More from this manufacturer</a>
       ${g?`<a class="btn btn-g" href="#/search?type=${encodeURIComponent(g.name)}">Compare all ${esc(g.name.toLowerCase())}s</a>`:""}
       <hr style="border:0;border-top:1px solid var(--line);margin:16px 0"><p class="note" style="margin:0"><b>We also offer</b> installation, user training, preventive maintenance and repair.</p></div></aside></div>`;
+    devExtras(d,kno);
     if(g){try{const s=await fda({search:`gmdn_terms.name.exact:"${g.name.replace(/"/g,"")}" AND ${ACTIVE}`,count:"company_name.exact",limit:15});const o=(s.results||[]).filter(x=>x.term!==d.company_name);
       if(o.length)document.getElementById("similar").innerHTML=`<div class="card" style="margin-top:16px"><h3 style="margin:0 0 4px">Other manufacturers of this equipment</h3><p class="note" style="margin:0 0 12px">${esc(g.name)}</p><div class="chips">${o.map(x=>`<a class="chip" href="#/search?type=${encodeURIComponent(g.name)}&maker=${encodeURIComponent(x.term)}">${esc(titleCase(x.term))}<i>${x.count}</i></a>`).join("")}</div></div>`}catch(e){}}
   }catch(e){app.innerHTML=`<div class="wrap">${errBox(e)}</div>`}
 }
 
+function siteTable(S,max=12){if(!S.length)return'<p class="note">No FDA-registered facilities found under this exact company name.</p>';
+  return `<table class="kv">${S.slice(0,max).map(e=>`<tr><th style="width:44%"><b style="color:var(--ink)">${esc(titleCase(e.name))}</b><br><span class="note">${esc(titleCase(e.city||""))}${e.city?", ":""}${ctry(e.cc)}</span></th><td>${[...e.roles].map(r=>`<span class="tag ${r==="Manufacturer"?"b":""}">${esc(r)}</span>`).join(" ")}${e.products.size?`<div class="note" style="margin-top:4px">${esc([...e.products].slice(0,4).join("; "))}${e.products.size>4?"…":""}</div>`:""}</td></tr>`).join("")}</table>${S.length>max?`<p class="note">+ ${S.length-max} more facilities</p>`:""}`}
+async function devExtras(d,kno){
+  sites(d.company_name).then(S=>{const el=document.getElementById("sites");if(el)el.innerHTML=siteTable(S,6)}).catch(()=>{const el=document.getElementById("sites");if(el)el.innerHTML='<p class="note">Facility data unavailable right now.</p>'});
+  const A=[];const us=d.commercial_distribution_status==="In Commercial Distribution";
+  A.push(["🇺🇸","United States (FDA)",`${devClass(d)?"Class "+devClass(d)+" · ":""}${kno?"510(k) "+subLink(kno):(d.premarket_submissions||[])[0]?.submission_number?subLink(d.premarket_submissions[0].submission_number):devClass(d)==="1"?"Exempt":"Listed"} · ${us?'<span class="tag g">In distribution</span>':'<span class="tag r">Discontinued</span>'}`]);
+  const box=()=>document.getElementById("auth");const draw=()=>{if(box())box().innerHTML=`<table class="kv">${A.map(a=>`<tr><th>${a[0]} ${a[1]}</th><td>${a[2]}</td></tr>`).join("")}</table><p class="note" style="margin:10px 0 0">Registration in these markets does not mean the device is registered in your country. We can check local registration (e.g. NDA Uganda) for you.</p>`};draw();
+  try{const h=await hcLookup(d.company_name);const m=hcMatch(h.lic,d);
+    A.push(["🇨🇦","Canada (Health Canada)",!h.comps.length?'<span class="note">Manufacturer not found in the Canadian licence database</span>':m.length?m.slice(0,3).map(l=>`<span class="tag g">Licensed</span> ${esc(l.licence_name)} <span class="note">· ${HCCLS[l.appl_risk_class]||""} · licence ${l.original_licence_no}</span>`).join("<br>"):`<span class="note">Manufacturer holds ${h.lic.length} active Canadian device licences. None matched this model name automatically.</span>`]);
+  }catch(e){A.push(["🇨🇦","Canada (Health Canada)",'<span class="note">Unavailable right now</span>'])}
+  try{const e=await euMaker(d.company_name);A.push(["🇪🇺","European Union (EUDAMED)",!e.loaded?'<span class="note">EU data is being prepared</span>':e.hit?`<span class="tag g">Registered EU manufacturer</span> SRN ${esc(e.hit[0])} <span class="note">· ${ctry(e.hit[2])}. Manufacturer-level registration.</span>`:'<span class="note">Manufacturer not found in EUDAMED under this name. It may use an EU authorised representative or another legal entity.</span>'])}catch(x){}
+  draw()}
 async function maker(name){
   app.innerHTML=`<div class="wrap">${loading("Loading manufacturer…")}</div>`;const nm=name.replace(/"/g,"");
   try{const s=`company_name.exact:"${nm}" AND ${ACTIVE}`;
@@ -592,7 +644,10 @@ async function maker(name){
       <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:6px"><div class="av" style="width:60px;height:60px;font-size:20px;background:${avColor(name)}">${esc(initials(name))}</div>
       <div style="flex:1;min-width:240px"><h1>${esc(titleCase(name))}</h1><p class="desc">${fmt(total(eq))} market-ready equipment records · ${fmt(total(all))} including accessories${c?` · Contact: ${c}`:""}</p></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-p" href="#/search?maker=${encodeURIComponent(name)}">Browse &amp; filter products</a><button class="btn btn-r" onclick="openQuote({title:'Get a quote',label:'Equipment from ${esc(titleCase(name)).replace(/'/g,"")}'})">Get a quote</button><a class="btn btn-g" href="${gq(makerShort(name)+" medical official website")}" target="_blank" rel="noopener">Website ↗</a></div></div></div></div>
-      <div class="wrap" style="padding:20px 20px 60px">${(types.results||[]).length?`<div class="card"><h3 style="margin:0 0 12px">Equipment made by ${esc(makerShort(name))}</h3><div class="chips">${types.results.map(t=>`<a class="chip" href="#/search?maker=${encodeURIComponent(name)}&type=${encodeURIComponent(t.term)}">${esc(t.term)}<i>${t.count}</i></a>`).join("")}</div></div>`:`<div class="card">This manufacturer only lists accessories or consumables. <a href="#/search?maker=${encodeURIComponent(name)}&acc=1">View them</a>.</div>`}</div>`;
+      <div class="wrap" style="padding:20px 20px 60px"><div class="grid g2" style="margin-bottom:16px;align-items:start"><div class="card"><h3 style="margin:0 0 8px">Manufacturing sites &amp; roles</h3><div id="msites">${loading("Loading facilities…")}</div></div><div><div class="card"><h3 style="margin:0 0 8px">🇪🇺 EU registration (EUDAMED)</h3><div id="meu">${loading("Checking EUDAMED…")}</div></div><div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px">🇨🇦 Canadian device licences</h3><div id="mhc">${loading("Checking Health Canada…")}</div></div></div></div>${(types.results||[]).length?`<div class="card"><h3 style="margin:0 0 12px">Equipment made by ${esc(makerShort(name))}</h3><div class="chips">${types.results.map(t=>`<a class="chip" href="#/search?maker=${encodeURIComponent(name)}&type=${encodeURIComponent(t.term)}">${esc(t.term)}<i>${t.count}</i></a>`).join("")}</div></div>`:`<div class="card">This manufacturer only lists accessories or consumables. <a href="#/search?maker=${encodeURIComponent(name)}&acc=1">View them</a>.</div>`}</div>`;
+    sites(name).then(S=>{const el=document.getElementById("msites");if(el)el.innerHTML=siteTable(S,15)}).catch(()=>{});
+    euMaker(name).then(e=>{const el=document.getElementById("meu");if(!el)return;el.innerHTML=!e.loaded?'<p class="note">EU data is being prepared.</p>':e.hit?`<p style="margin:0"><span class="tag g">Registered manufacturer</span> ${esc(e.hit[1])}</p><p class="note">SRN ${esc(e.hit[0])} · ${esc(e.hit[3]||"")} ${ctry(e.hit[2])}${e.hit[4]?` · <a href="${esc(e.hit[4])}" target="_blank" rel="noopener">website ↗</a>`:""}</p>`:'<p class="note">Not found in EUDAMED under this exact name. It may sell in the EU through an authorised representative.</p>'});
+    hcLookup(name).then(h=>{const el=document.getElementById("mhc");if(!el)return;el.innerHTML=!h.comps.length?'<p class="note">Not found in the Canadian licence database.</p>':`<p class="note" style="margin-top:0">${h.lic.length} active licences held by ${esc(h.comps.map(c=>titleCase(c.company_name)).join(", "))}</p>${h.lic.slice(0,12).map(l=>`<div style="padding:6px 0;border-top:1px solid var(--line);font-size:13.5px">${esc(l.licence_name)} <span class="note">· ${HCCLS[l.appl_risk_class]||""}</span></div>`).join("")}${h.lic.length>12?`<p class="note">+ ${h.lic.length-12} more</p>`:""}`}).catch(()=>{const el=document.getElementById("mhc");if(el)el.innerHTML='<p class="note">Unavailable right now.</p>'});
   }catch(e){app.innerHTML=`<div class="wrap">${errBox(e)}</div>`}
 }
 
@@ -606,6 +661,29 @@ async function suppliers(){
 }
 function supFilter(v){const el=document.getElementById("sl");if(!el||!window._SUP)return;const L=window._SUP.filter(x=>!v||x.term.toLowerCase().includes(v.toLowerCase()));
   el.innerHTML=`<p class="note">${fmt(L.length)} manufacturers</p><div class="grid g4">${L.slice(0,160).map(x=>`<a class="card sup" href="#/maker/${encodeURIComponent(x.term)}"><span class="av" style="background:${avColor(x.term)}">${esc(initials(x.term))}</span><span><b>${esc(titleCase(x.term))}</b><span>${fmt(x.count)} equipment records</span></span></a>`).join("")}</div>${L.length>160?`<p class="note center" style="margin-top:14px">Showing the top 160. Type a name to find others.</p>`:""}`}
+
+const AFRICA=["UG","KE","TZ","RW","BI","SS","ET","SO","DJ","ER","SD","EG","LY","TN","DZ","MA","NG","GH","CI","SN","CM","CD","CG","GA","AO","ZM","ZW","MW","MZ","BW","NA","ZA","LS","SZ","MG","MU","SC","KM","BJ","TG","BF","ML","NE","TD","CF","GQ","GN","GW","SL","LR","GM","MR","CV","ST"];
+async function distributors(){
+  const p=qp();const cc=(p.cc||"").toUpperCase();
+  app.innerHTML=`<div class="ph"><div class="wrap"><div class="crumbs"><a href="#/">Home</a> / Distributors</div><h1>Distributors &amp; importers</h1><p class="desc">Licensed medical device distributors, wholesalers, importers and authorised representatives by country, from national regulators and EUDAMED, plus suppliers registered on Cream Biomed.</p>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><select id="dcc" style="border:1px solid var(--line);border-radius:9px;padding:10px;min-width:260px" onchange="go('#/distributors?cc='+this.value)"><option value="">Choose a country…</option></select>
+    <input class="ff" id="dq" style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:9px;padding:10px" placeholder="Filter by name…" oninput="distFilter()"></div></div></div>
+  <div class="wrap" style="padding:20px 20px 60px"><div id="dl">${cc?loading("Loading…"):""}</div>
+  <div class="band" style="margin-top:24px"><div><h2>Are you a distributor or service company?</h2><p>Register for free so hospitals in your country can find you and send you quote requests.</p></div><a class="btn btn-g" href="#/list">Register as a supplier</a></div></div>`;
+  const idx=(await dataFile("partners/index.json"))?.countries||{};const sup=await suppliersAll();
+  const counts={...idx};sup.forEach(s=>(s.countries||[]).forEach(c=>counts[c]=(counts[c]||0)+1));
+  const ccs=Object.keys(counts).sort((a,b)=>(AFRICA.includes(b)-AFRICA.includes(a))||cname(a).localeCompare(cname(b)));
+  const sel=document.getElementById("dcc");if(!sel)return;
+  sel.innerHTML=`<option value="">Choose a country…</option><optgroup label="Africa">${ccs.filter(c=>AFRICA.includes(c)).map(c=>`<option value="${c}" ${c===cc?"selected":""}>${flag(c)} ${esc(cname(c))} (${counts[c]})</option>`).join("")}</optgroup><optgroup label="Rest of the world">${ccs.filter(c=>!AFRICA.includes(c)).map(c=>`<option value="${c}" ${c===cc?"selected":""}>${flag(c)} ${esc(cname(c))} (${counts[c]})</option>`).join("")}</optgroup>`;
+  const dl=document.getElementById("dl");
+  if(!cc){dl.innerHTML=`<p class="note">${Object.keys(counts).length?`${fmt(Object.values(counts).reduce((a,b)=>a+b,0))} companies in ${Object.keys(counts).length} countries. Pick a country above.`:"Distributor data is being prepared. Check back soon."}</p><div class="chips">${ccs.filter(c=>AFRICA.includes(c)).concat(ccs.filter(c=>!AFRICA.includes(c)).slice(0,24)).map(c=>`<a class="chip" href="#/distributors?cc=${c}">${flag(c)} ${esc(cname(c))}<i>${counts[c]}</i></a>`).join("")}</div>`;return}
+  const f=idx[cc]?await dataFile("partners/"+cc+".json"):null;
+  const own=sup.filter(s=>(s.countries||[]).includes(cc)).map(s=>[s.company,"Cream Biomed registered "+(s.type||"supplier").toLowerCase(),s.city||"",s.website||"","Cream Biomed",s.products||"",s]);
+  window._DL=[...own,...(f?.rows||[])];distFilter();
+}
+function distFilter(){const el=document.getElementById("dl");if(!el||!window._DL)return;const v=(document.getElementById("dq")?.value||"").toLowerCase();const L=window._DL.filter(r=>!v||r[0].toLowerCase().includes(v));
+  el.innerHTML=L.length?`<p class="note">${fmt(L.length)} companies</p><div class="grid g3">${L.slice(0,300).map(r=>`<div class="card sup" style="align-items:flex-start"><span class="av" style="background:${r[4]==="Cream Biomed"?"var(--red)":avColor(r[0])}">${esc(initials(r[0]))}</span><span style="min-width:0"><b>${esc(r[0])}</b><span>${esc(r[1])}${r[2]?" · "+esc(r[2]):""}</span><br><span style="font-size:12px">${r[4]==="Cream Biomed"?'<span class="tag r">Verified by Cream Biomed</span>':`<span class="tag">Source: ${esc(r[4])}</span>`} ${r[5]&&r[4]!=="Cream Biomed"?`<span class="note">${esc(r[5])}</span>`:""}</span>${r[4]==="Cream Biomed"&&r[5]?`<div class="note" style="margin-top:4px">${esc(r[5])}</div>`:""}${r[3]?`<div style="margin-top:4px"><a href="${esc(r[3])}" target="_blank" rel="noopener" style="font-size:13px">Website ↗</a></div>`:""}</span></div>`).join("")}</div>${L.length>300?'<p class="note">Showing the first 300. Use the filter to find others.</p>':""}`:`<div class="empty">No distributors listed for this country yet.<br><br><a class="btn btn-r" href="#/list">Register as a supplier</a> <button class="btn btn-g" data-act="ask">Ask us to find a local supplier</button></div>`}
+async function suppliersAll(){return window._SUPPLIERS||[]}
 
 function planner(id){
   if(!id){app.innerHTML=`<div class="ph"><div class="wrap"><div class="crumbs"><a href="#/">Home</a> / Facility planner</div><h1>Facility planner</h1><p class="desc">Equipping a new unit or upgrading an old one? Pick the facility type to see essential equipment, compare options for each item, and send one quotation request for everything.</p></div></div>
@@ -706,6 +784,7 @@ function route(){
   if(r==="device"&&seg[1])return device(seg[1]);
   if(r==="maker"&&seg[1])return maker(seg.slice(1).join("/"));
   if(r==="suppliers")return suppliers();
+  if(r==="distributors")return distributors();
   if(r==="planner")return planner(seg[1]);
   if(r==="compare")return compare();
   if(r==="quote")return quote();
