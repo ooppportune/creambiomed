@@ -427,8 +427,8 @@ async function manualsSearch(q){const dom=domFromQuery(q);if(!dom)return{dom:"",
 const CSTOP=new Set("system systems monitor monitors patient series medical device devices unit units the and with for ultrasound diagnostic portable digital mobile model new pro plus".split(" "));
 function matchCatalog(items,d,max=3){const raw=[d.brand_name,d.version_or_model_number].join(" ").toLowerCase().replace(/[^a-z0-9 ]+/g," ").split(/\s+/).filter(t=>t.length>=3&&!CSTOP.has(t)&&!/^\d+$/.test(t));
   const toks=[...new Set(raw)];if(!toks.length)return[];
-  const sc=items.map(it=>{const txt=(decodeURIComponent(new URL(it[0]).pathname)+" "+it[1]).toLowerCase().replace(/[^a-z0-9]+/g,"");let s=0;
-    toks.forEach(t=>{if(txt.includes(t))s+=3;else{const p=t.replace(/\d+[a-z]?$/,"");if(p.length>=4&&p!==t&&txt.includes(p))s+=1}});return[s,it]}).filter(x=>x[0]>0).sort((a,b)=>b[0]-a[0]);
+  const sc=items.map(it=>{let pth=it[0];try{pth=decodeURIComponent(new URL(it[0]).pathname)}catch(e){}const txt=" "+(pth+" "+it[1]).toLowerCase().replace(/[^a-z0-9]+/g," ")+" ";const sq=txt.replace(/ /g,"");let s=0;
+    toks.forEach(t=>{if(txt.includes(" "+t)||(t.length>=5&&sq.includes(t)))s+=3;else{const p=t.replace(/\d+[a-z]?$/,"");if(p.length>=4&&p!==t&&txt.includes(" "+p+" "))s+=1}});return[s,it]}).filter(x=>x[0]>0).sort((a,b)=>b[0]-a[0]);
   return sc.slice(0,max).map(x=>x[1])}
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return""}};
 function catCard(it,big){return `<div class="card" style="padding:0;overflow:hidden;${big?"display:flex;flex-wrap:wrap;":""}">${it[2]?`<a href="${esc(it[0])}" target="_blank" rel="noopener" style="display:block;${big?"flex:0 0 260px;max-width:100%;":""}background:#fff;border-bottom:1px solid var(--line)"><img src="${esc(it[2])}" alt="${esc(it[1])}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;${big?"height:220px;":"height:150px;"}object-fit:contain;background:#fff;padding:8px" onerror="this.parentNode.remove()"></a>`:""}

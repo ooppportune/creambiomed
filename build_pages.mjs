@@ -56,9 +56,10 @@ function matchCatalog(items, d) {
   let best = null, bs = 0;
   for (const it of items) {
     let p = it[0]; try { p = decodeURIComponent(new URL(it[0]).pathname); } catch {}
-    const txt = (p + " " + it[1]).toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const txt = " " + (p + " " + it[1]).toLowerCase().replace(/[^a-z0-9]+/g, " ") + " ";
+    const sq = txt.replace(/ /g, "");
     let s = 0;
-    for (const t of toks) { if (txt.includes(t)) s += 3; else { const q = t.replace(/\d+[a-z]?$/, ""); if (q.length >= 4 && q !== t && txt.includes(q)) s += 1; } }
+    for (const t of toks) { if (txt.includes(" " + t) || (t.length >= 5 && sq.includes(t))) s += 3; else { const q = t.replace(/\d+[a-z]?$/, ""); if (q.length >= 4 && q !== t && txt.includes(" " + q + " ")) s += 1; } }
     if (s > bs) { bs = s; best = it; }
   }
   return bs >= 3 ? best : null;
