@@ -382,6 +382,17 @@ def sync_who(partners=None):
         if rec[0] and rec[5]:
             rec[5] = re.sub(r"\s*\(English version.*?\)", "", rec[5])
             out.append(rec)
+    merged = {}
+    for rec in out:  # one row per pack size in WHO's CSV; keep one per product, all codes joined
+        k = (rec[0].lower(), rec[5].lower())
+        if k in merged:
+            m = merged[k]
+            for i in (1, 2):
+                if rec[i] and rec[i] not in m[i]:
+                    m[i] = (m[i] + ", " + rec[i]).strip(", ")
+        else:
+            merged[k] = list(rec)
+    out = list(merged.values())
     if len(out) < 20:
         raise RuntimeError(f"WHO list too short ({len(out)} rows)")
     write(f"{OUT}/who_ivd.json", {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "source": "WHO list of prequalified in vitro diagnostic products", "rows": out})
