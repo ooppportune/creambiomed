@@ -107,10 +107,7 @@ def sync_eudamed(partners):
 
 
 # ---------------------------------------------------------------- Rwanda FDA
-RW_URLS = [
-    "https://rwandafda.gov.rw/monitoring-tool/documents-management/uploads/1/Licensed-Premises/1781787882_8.%20%20LIST%20OF%20LICENSED%20WHOLESALE%20OF%20MEDICAL%20DEVICES-MAY%2020261.pdf",
-    "https://rwandafda.gov.rw/monitoring-tool/documents-management/uploads/1/Licensed-Premises/1772531515_8.%20%20eLIST%20OF%20LICENSED%20WHOLESALE%20OF%20MEDICAL%20DEVICES-JANUARY%202026.pdf",
-]
+RW_URLS = []  # Rwanda FDA moves its PDFs often; Rwandan wholesalers now come from curated_partners.json. Add a current PDF URL here to re-enable.
 
 
 def parse_rw_text(text):
@@ -134,6 +131,8 @@ def sync_rwanda(partners):
         import io, pdfplumber
     except ImportError:
         return {"rw_error": "pdfplumber missing"}
+    if not RW_URLS:
+        return {}
     errors = []
     for url in RW_URLS:
         try:
@@ -361,6 +360,21 @@ def main():
         except Exception as e:
             print(f"{fn.__name__} failed: {e}", file=sys.stderr)
             meta["sources"][fn.__name__ + "_error"] = str(e)[:300]
+    try:
+        cur = json.load(open("curated_partners.json"))
+        n = 0
+        for cc, rows in cur.items():
+            if cc.startswith("_"):
+                continue
+            have = {r[0].lower() for r in partners.get(cc, [])}
+            for r in rows:
+                if r[0].lower() not in have:
+                    partners[cc].append(r); n += 1
+        meta["sources"]["curated_partners"] = n
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        meta["sources"]["curated_partners_error"] = str(e)[:200]
     if partners:
         idx = {}
         for cc, rows in partners.items():
