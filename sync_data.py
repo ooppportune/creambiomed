@@ -264,7 +264,7 @@ def crawl_domain(dom, old):
     return items, len(urls)
 
 
-def sync_catalogs():
+def sync_catalogs(partners=None):
     from concurrent.futures import ThreadPoolExecutor
     idx = {}
     def one(dom):
@@ -298,6 +298,7 @@ def main():
             meta["sources"].update(fn(partners) or {})
         except Exception as e:
             print(f"{fn.__name__} failed: {e}", file=sys.stderr)
+            meta["sources"][fn.__name__ + "_error"] = str(e)[:300]
     if partners:
         idx = {}
         for cc, rows in partners.items():
