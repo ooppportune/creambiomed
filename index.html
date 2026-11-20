@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cream Biomed | Medical Equipment Search Engine</title>
-<meta name="description" content="Search and compare market-ready medical equipment from manufacturers worldwide. Regulatory data, manuals, quotes, installation and maintenance from Cream Biomed and Scientific Limited.">
+<script defer src="/stats.js"></script><link rel="canonical" href="https://creambiomedscientific.com/"><meta name="description" content="Search and compare market-ready medical equipment from manufacturers worldwide. Regulatory data, manuals, quotes, installation and maintenance from Cream Biomed and Scientific Limited.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='none' stroke='%231f3fbf' stroke-width='6'/%3E%3Cpath d='M8 34h12l5-12 7 22 6-16 4 6h14' fill='none' stroke='%23d7262e' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -205,7 +205,7 @@ footer .disc{border-top:1px solid rgba(255,255,255,.12);margin-top:26px;padding-
   <div class="cols">
     <div><h4>Cream Biomed and Scientific Limited</h4><p>A team of biomedical engineers and medical doctors helping hospitals, clinics, laboratories and individuals find, buy and maintain quality medical equipment at affordable prices.</p>
       <p><a href="https://www.facebook.com/creambiomedscientificltd" target="_blank" rel="noopener">Facebook</a> · <a href="javascript:openQuote()">Contact us</a></p></div>
-    <div><h4>Find</h4><p><a href="#/equipment">All equipment</a><br><a href="#/suppliers">Manufacturers</a><br><a href="#/distributors">Distributors</a><br><a href="#/planner">Facility planner</a><br><a href="#/manuals">Manuals</a></p></div>
+    <div><h4>Find</h4><p><a href="#/equipment">All equipment</a><br><a href="#/suppliers">Manufacturers</a><br><a href="#/distributors">Distributors</a><br><a href="#/planner">Facility planner</a><br><a href="#/manuals">Manuals</a><br><a href="/c/">Categories A–Z</a><br><a href="/m/">Manufacturers A–Z</a></p></div>
     <div><h4>Services</h4><p><a href="#/services">Sourcing &amp; procurement</a><br><a href="#/services">Installation &amp; training</a><br><a href="#/services">Maintenance &amp; repair</a></p></div>
     <div><h4>Company</h4><p><a href="#/about">About us</a><br><a href="#/list">For suppliers</a><br><a href="#/about">About the data</a></p></div>
   </div>
@@ -231,6 +231,9 @@ const CONFIG={ whatsapp:"256782711220", /* digits only, e.g. "256700000000" */ m
   /* Phase 3: supplier self-registration (Google Form -> Google Sheet) */
   supplierForm:"https://docs.google.com/forms/d/e/1FAIpQLSeCVweAXCaeg7dBnVsF6OXrKkdBI47E5cDFd4B_sLR78LNSIg/formResponse",
   supplierFields:{company:"entry.1240875162",type:"entry.582527289",countries:"entry.1049046576",city:"entry.1623332141",website:"entry.1813992082",email:"entry.779448793",phone:"entry.888044677",brands:"entry.1125635217",categories:"entry.1758129587",products:"entry.197206789",photos:"entry.928721854"},
+  enquiryForm:"https://docs.google.com/forms/d/e/1FAIpQLSd5jMpZPxVRYMEWTTjFQhADA5DYsJV4_KIM42WnDemEjNCt0g/formResponse",
+  enquiryFields:{type:"entry.1240875162",request:"entry.582527289",name:"entry.1049046576",org:"entry.1623332141",location:"entry.1813992082",contact:"entry.779448793",notes:"entry.888044677",page:"entry.1125635217",channel:"entry.1758129587",products:"entry.197206789",extras:"entry.928721854"},
+  pricesCSV:"https://docs.google.com/spreadsheets/d/e/2PACX-1vQFo7teV9VMHcuaIcYK_ijxf3diksaL2fSJbCnjL3Js6CE7WzHsBjIMgVqV5dKbwjWq0j4DOjT21EbY/pub?gid=692424819&single=true&output=csv",
   suppliersCSV:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRgOcyT1tSmVN03alNN_C7ASk_YfRQMTXlfNoDk9mzmEgPM4calC8b5ff0lGHxG0wls12QCN49fXVyn/pub?gid=328227773&single=true&output=csv" /* published CSV of the APPROVED tab */ };
 /* ====================== */
 const API="https://api.fda.gov/device/udi.json";
@@ -393,7 +396,17 @@ async function makerSite(name){const k=normName(name).split(" ");const first=k[0
   try{const e=await euMaker(name);if(e.hit&&e.hit[4])return cleanSite(e.hit[4])}catch(x){}return""}
 /* Manufacturer catalogue (nightly crawl of manufacturers' public product pages) */
 function domFor(name){const k=normName(name).split(" ");const f=["shenzhen","beijing","guangdong","jiangsu","shanghai","zhejiang"].includes(k[0])?k[1]:k[0];return MAKER_SITES[f]||""}
-async function catalogFor(dom){if(!dom)return[];const j=await dataFile("catalog/"+dom+".json");return Array.isArray(j?.items)?j.items:[]}
+async function catalogFile(dom){if(!dom)return null;return await dataFile("catalog/"+dom+".json")}
+async function catalogFor(dom){const j=await catalogFile(dom);return Array.isArray(j?.items)?j.items:[]}
+function domFromQuery(q){for(const t of normName(q).split(" ")){if(MAKER_SITES[t])return MAKER_SITES[t]}return""}
+const docIcon=l=>/service|technical/i.test(l)?"🔧":/brochure|catalog|data ?sheet|spec|product sheet/i.test(l)?"📄":"📘";
+function docRow(label,url,sub){return `<a class="docrow" href="${esc(url)}" target="_blank" rel="noopener"><span class="di">${docIcon(label)}</span><span><b>${esc(label)}</b><small>${esc(sub||("Official document on "+host(url)))}</small></span><span class="go">↗</span></a>`}
+async function manualsSearch(q){const dom=domFromQuery(q);if(!dom)return{dom:"",rows:[]};const f=await catalogFile(dom);if(!f)return{dom,rows:[]};
+  const brand=new Set(Object.keys(MAKER_SITES).filter(k=>MAKER_SITES[k]===dom));const toks=normName(q).split(" ").filter(t=>t.length>=2&&!brand.has(t));
+  const hit=t=>{const x=String(t).toLowerCase().replace(/[^a-z0-9]+/g,"");return toks.every(k=>x.includes(k.replace(/[^a-z0-9]+/g,"")))};
+  const rows=[];(f.items||[]).forEach(it=>{if(!(it[6]||[]).length)return;if(toks.length&&!hit(it[1]+" "+it[0]))return;it[6].forEach(([l,u])=>rows.push([l,u,it[1].replace(/\s*[-|–]\s*[^-|–]*$/,"")]))});
+  (f.docs||[]).forEach(([l,u])=>{if(!toks.length||hit(l+" "+u))rows.push([l.replace(/[-_]+/g," ").replace(/\.pdf$/i,""),u,"From "+dom])});
+  const seen=new Set();return{dom,rows:rows.filter(r=>!seen.has(r[1])&&seen.add(r[1])).slice(0,40)}}
 const CSTOP=new Set("system systems monitor monitors patient series medical device devices unit units the and with for ultrasound diagnostic portable digital mobile model new pro plus".split(" "));
 function matchCatalog(items,d,max=3){const raw=[d.brand_name,d.version_or_model_number].join(" ").toLowerCase().replace(/[^a-z0-9 ]+/g," ").split(/\s+/).filter(t=>t.length>=3&&!CSTOP.has(t)&&!/^\d+$/.test(t));
   const toks=[...new Set(raw)];if(!toks.length)return[];
@@ -401,12 +414,19 @@ function matchCatalog(items,d,max=3){const raw=[d.brand_name,d.version_or_model_
     toks.forEach(t=>{if(txt.includes(t))s+=3;else{const p=t.replace(/\d+[a-z]?$/,"");if(p.length>=4&&p!==t&&txt.includes(p))s+=1}});return[s,it]}).filter(x=>x[0]>0).sort((a,b)=>b[0]-a[0]);
   return sc.slice(0,max).map(x=>x[1])}
 const host=u=>{try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return""}};
-function catCard(it,big){return `<div class="card" style="padding:0;overflow:hidden;${big?"display:flex;flex-wrap:wrap;":""}"><a href="${esc(it[0])}" target="_blank" rel="noopener" style="display:block;${big?"flex:0 0 260px;max-width:100%;":""}background:#fff;border-bottom:1px solid var(--line)"><img src="${esc(it[2])}" alt="${esc(it[1])}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;${big?"height:220px;":"height:150px;"}object-fit:contain;background:#fff;padding:8px" onerror="this.closest('.card').remove()"></a>
+function catCard(it,big){return `<div class="card" style="padding:0;overflow:hidden;${big?"display:flex;flex-wrap:wrap;":""}">${it[2]?`<a href="${esc(it[0])}" target="_blank" rel="noopener" style="display:block;${big?"flex:0 0 260px;max-width:100%;":""}background:#fff;border-bottom:1px solid var(--line)"><img src="${esc(it[2])}" alt="${esc(it[1])}" loading="lazy" referrerpolicy="no-referrer" style="width:100%;${big?"height:220px;":"height:150px;"}object-fit:contain;background:#fff;padding:8px" onerror="this.parentNode.remove()"></a>`:""}
   <div style="padding:12px 14px;flex:1;min-width:220px"><b style="font-size:14.5px">${esc(it[1].replace(/\s*[-|–]\s*[^-|–]*$/,"")||it[1])}</b>${it[3]?`<p class="note" style="margin:6px 0">${esc(it[3])}</p>`:""}<div class="note" style="font-size:12px">Source: <a href="${esc(it[0])}" target="_blank" rel="noopener">${esc(host(it[0]))} ↗</a></div></div></div>`}
 async function thumbRows(){const rows=[...document.querySelectorAll("tr[data-key]")];const doms=[...new Set(rows.map(r=>domFor(DEV.get(r.dataset.key)?.company_name||"")).filter(Boolean))];
   const cats=Object.fromEntries(await Promise.all(doms.map(async d=>[d,await catalogFor(d)])));
-  rows.forEach(r=>{const d=DEV.get(r.dataset.key);const dom=d&&domFor(d.company_name);const it=dom&&cats[dom]?.length?matchCatalog(cats[dom],d,1)[0]:null;
+  rows.forEach(r=>{const d=DEV.get(r.dataset.key);const dom=d&&domFor(d.company_name);const it=dom&&cats[dom]?.length?matchCatalog(cats[dom].filter(x=>x[2]),d,1)[0]:null;
     if(it){const t=r.querySelector(".ti");if(t){t.style.background="#fff";t.style.padding="2px";t.style.border="1px solid var(--line)";t.innerHTML=`<img src="${esc(it[2])}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain" onerror="this.remove()">`}}})}
+/* Indicative prices (Prices tab of the enquiry spreadsheet, published as CSV) */
+let _PR=null;async function pricesAll(){if(_PR)return _PR;_PR=(async()=>{if(!CONFIG.pricesCSV||!/^https/.test(CONFIG.pricesCSV))return[];const r=await fetch(CONFIG.pricesCSV);if(!r.ok)return[];const R=parseCSV(await r.text());const h=(R.shift()||[]).map(x=>x.trim().toLowerCase());
+  const ix=n=>h.indexOf(n);return R.map(c=>({brand:c[ix("brand")]||"",model:c[ix("model")]||"",product:c[ix("product")]||"",from:c[ix("price from")]||"",to:c[ix("price to")]||"",cur:c[ix("currency")]||"",inc:c[ix("includes")]||"",upd:c[ix("updated")]||"",notes:c[ix("notes")]||""})).filter(p=>(p.brand||p.product)&&(p.from||p.to))})();_PR.catch(()=>{_PR=null});return _PR}
+function pricesFor(L,d){const nb=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");const hay=nb([d.brand_name,d.company_name,d.version_or_model_number].join(" "));const hay2=nb([d.brand_name,d.version_or_model_number,d.gmdn_terms?.[0]?.name].join(" "));
+  return L.filter(p=>{const b=nb(p.brand);if(b&&!hay.includes(b))return false;const m=nb(p.model);if(m)return hay.includes(m);const pr=nb(p.product);return pr?hay2.includes(pr):false})}
+const money=(v,c)=>{const n=Number(String(v).replace(/[^0-9.]/g,""));return v?(c?c+" ":"")+(isFinite(n)&&n?n.toLocaleString():v):""};
+function priceBox(L){return `<div class="card" style="margin-top:16px;border-color:#9fd3a8;background:#f3fbf4"><h3 style="margin:0 0 8px">Indicative price</h3>${L.slice(0,4).map(p=>`<div style="margin:6px 0"><b style="font-size:18px">${esc(money(p.from,p.cur))}${p.to&&p.to!==p.from?" – "+esc(money(p.to,p.cur)):""}</b>${p.model||p.product?` <span class="note">· ${esc([p.brand,p.model||p.product].filter(Boolean).join(" "))}</span>`:""}${p.inc?`<div class="note">Includes: ${esc(p.inc)}</div>`:""}${p.notes?`<div class="note">${esc(p.notes)}</div>`:""}${p.upd?`<div class="note">Updated ${esc(p.upd)}</div>`:""}</div>`).join("")}<p class="note" style="margin:8px 0 0">Guide price from recent Cream Biomed quotations. Final price depends on configuration, quantity, delivery and installation.</p><button class="btn btn-r btn-sm" style="margin-top:8px" data-act="ask">Get an exact quote</button></div>`}
 const HC="https://health-products.canada.ca/api/medical-devices/";
 const HCCLS={1:"Class I",2:"Class II",3:"Class III",4:"Class IV"};
 async function hcLookup(name){const mk=makerShort(name);const key=mk.split(" ").slice(0,2).join(" ");
@@ -459,11 +479,14 @@ saveQ();saveC();
 let quoteCtx=null;
 function openQuote(ctx){quoteCtx=ctx||null;document.getElementById("q-item").value=ctx?.label||"";document.getElementById("qm-title").textContent=ctx?.title||"Ask a biomedical engineer";document.getElementById("q-wa").style.display=CONFIG.whatsapp?"":"none";document.getElementById("qm").classList.add("on")}
 function closeQuote(){document.getElementById("qm").classList.remove("on")}
+function logEnquiry(e){try{if(!CONFIG.enquiryForm)return;const fd=new URLSearchParams();e.page=e.page||location.href;for(const k in e)if(CONFIG.enquiryFields[k]&&e[k])fd.append(CONFIG.enquiryFields[k],String(e[k]).slice(0,4000));
+  fetch(CONFIG.enquiryForm,{method:"POST",mode:"no-cors",body:fd}).catch(()=>{})}catch(x){}}
 async function deliver(t){if(CONFIG.whatsapp){window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(t)}`,"_blank");return}
   try{await navigator.clipboard.writeText(t);toast("Message copied. Paste it into the Messenger chat.")}catch(e){toast("Opening Messenger…")}window.open(CONFIG.messenger,"_blank")}
 function sendQuote(via){const v=id=>document.getElementById(id).value.trim();
   let t=`Hello Cream Biomed,\n\n${v("q-item")||"I need help with medical equipment."}`;if(quoteCtx?.extra)t+=`\n${quoteCtx.extra}`;
   t+=`\n\nName: ${v("q-name")||"-"}\nOrganisation: ${v("q-org")||"-"}\nLocation: ${v("q-loc")||"-"}\nContact: ${v("q-contact")||"-"}`;if(v("q-notes"))t+=`\nNotes: ${v("q-notes")}`;
+  logEnquiry({type:quoteCtx?.title||"Enquiry",request:v("q-item"),name:v("q-name"),org:v("q-org"),location:v("q-loc"),contact:v("q-contact"),notes:v("q-notes"),channel:via==="fb"?"Messenger":"WhatsApp",products:quoteCtx?.extra||""});
   if(via==="fb"&&CONFIG.whatsapp){(async()=>{try{await navigator.clipboard.writeText(t);toast("Message copied. Paste it into the Messenger chat.")}catch(e){}window.open(CONFIG.messenger,"_blank")})()}else deliver(t);closeQuote()}
 
 /* ---------- query building ---------- */
@@ -633,7 +656,7 @@ async function device(key){
         ${d.device_description?`<p style="margin:18px 0 0">${esc(d.device_description)}</p>`:""}
         ${g?.definition?`<p class="note" style="margin-top:10px"><b>What this type of device does:</b> ${esc(g.definition)}</p>`:""}
         <div class="photo-cta" id="pcta"><span style="font-size:30px">📷</span><div><b>See this equipment</b><br><span class="note" id="pcta-note">Finding the manufacturer's website…</span></div><span id="pcta-btns" style="display:flex;gap:8px;flex-wrap:wrap"></span></div><div id="catgal"></div><div id="supgal"></div></div>
-      <div class="card" style="margin-top:16px"><h3 style="margin:0 0 10px">Specifications &amp; regulatory details</h3><table class="kv">${rows.map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table><p class="note" style="margin:12px 0 0">Source: U.S. FDA GUDID via openFDA. FDA clearance does not mean the device is registered in your country. We can check local registration for you.</p></div>
+      <div id="mprice"></div><div id="mspecs"></div><div class="card" style="margin-top:16px"><h3 style="margin:0 0 10px">Specifications &amp; regulatory details</h3><table class="kv">${rows.map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table><p class="note" style="margin:12px 0 0">Source: U.S. FDA GUDID via openFDA. FDA clearance does not mean the device is registered in your country. We can check local registration for you.</p></div>
       <div class="card" style="margin-top:16px" id="manuals"><h3 style="margin:0 0 4px">Manuals &amp; documents</h3><p class="note" style="margin:0">Official records open directly; manuals and brochures are sent to you by our engineers.</p>
         ${k510pdf(kno)?`<a class="docrow" href="${k510pdf(kno)}" target="_blank" rel="noopener"><span class="di">🏛️</span><span><b>FDA 510(k) clearance letter</b><small>Official FDA document: intended use and classification</small></span><span class="go">↗</span></a>`:""}<div id="docs">${docLinks(mq,g?.name,{di})}</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-r btn-sm" onclick="openQuote({title:'Request a manual',label:'Manual for ${esc(mq).replace(/'/g,"")}'})">Can't find it? Ask our engineers</button><button class="btn btn-g btn-sm" onclick="openQuote({title:'Book service or repair',label:'Service / repair: ${esc(mq).replace(/'/g,"")}'})">Book service or repair</button></div></div>
@@ -654,7 +677,10 @@ async function device(key){
       if(dom){n.innerHTML=`Official manufacturer: <b>${esc(dom)}</b>. Our engineers can send you photos, the brochure and a quote for this exact model.`;
         b.innerHTML=`<button class="btn btn-p btn-sm" onclick="openQuote({title:'Request photos & brochure',label:'Photos, brochure and price for ${esc(mq).replace(/'/g,"")}'})">Request photos &amp; brochure</button><a class="btn btn-g btn-sm" href="https://${esc(dom)}" target="_blank" rel="noopener">${esc(dom)} ↗</a>`}
       else{n.textContent="Our engineers can send you photos, the brochure and a quote for this exact model.";b.innerHTML=`<button class="btn btn-p btn-sm" onclick="openQuote({title:'Request photos & brochure',label:'Photos, brochure and price for ${esc(mq).replace(/'/g,"")}'})">Request photos &amp; brochure</button>`}});
+    pricesAll().then(L=>{const m=pricesFor(L,d);const el=document.getElementById("mprice");if(el&&m.length)el.innerHTML=priceBox(m)}).catch(()=>{});
     catalogFor(domFor(d.company_name)).then(items=>{const el=document.getElementById("catgal");if(!el||!items.length)return;const m=matchCatalog(items,d,3);
+      const top=m[0];if(top&&(top[5]||[]).length){const sp=document.getElementById("mspecs");if(sp)sp.innerHTML=`<div class="card" style="margin-top:16px"><h3 style="margin:0 0 10px">Manufacturer specifications</h3><table class="kv">${top[5].map(r=>`<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join("")}</table><p class="note" style="margin:10px 0 0">Source: <a href="${esc(top[0])}" target="_blank" rel="noopener">${esc(host(top[0]))} ↗</a>. Confirm the exact configuration with us before ordering.</p></div>`}
+      const docs=m.flatMap(it=>it[6]||[]).filter((x,i,a)=>a.findIndex(y=>y[1]===x[1])===i).slice(0,8);if(docs.length){const dd=document.getElementById("docs");if(dd)dd.insertAdjacentHTML("afterbegin",docs.map(([l,u])=>docRow(l,u)).join(""))}
       if(m.length)el.innerHTML=`<div style="margin-top:16px"><b>From the manufacturer's catalogue</b><div style="margin-top:8px">${catCard(m[0],true)}</div>${m.length>1?`<div class="grid g2" style="margin-top:10px">${m.slice(1).map(it=>catCard(it)).join("")}</div>`:""}</div>`});
     suppliersFor(d.company_name,sub?.name).then(L=>{const ph=L.flatMap(s=>s.photos.map(u=>[u,s.company])).slice(0,6);const el=document.getElementById("supgal");if(el&&ph.length)el.innerHTML=`<div style="margin-top:14px"><b>Photos from authorised distributors</b><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${ph.map(([u,c])=>`<a href="${esc(u)}" target="_blank" rel="noopener" title="${esc(c)}"><img src="${esc(u)}" alt="" loading="lazy" style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--line)" onerror="this.parentElement.remove()"></a>`).join("")}</div></div>`});
     suppliersFor(d.company_name,sub?.name).then(L=>{const el=document.getElementById("wtb");if(el)el.innerHTML=L.length?L.slice(0,4).map(supplierCard).join(""):`<p class="note" style="margin-top:10px">No registered local distributor yet. Cream Biomed can source it for you.</p><button class="btn btn-sm btn-r" data-act="addq" data-key="${esc(key)}">+ Add to quote list</button>`});
@@ -783,7 +809,8 @@ function quote(){
 function sendList(){const v=id=>document.getElementById(id).value.trim();
   let t=`Hello Cream Biomed, please send a quotation for:\n\n`+QL.map((it,i)=>`${i+1}. ${it.name}${it.model?" – "+it.model:""} | ${it.maker}${it.di?" | DI "+it.di:""} | Qty ${it.qty||1}`).join("\n");
   t+=`\n\nInclude: ${[document.getElementById("r-inst").checked?"installation & training":"",document.getElementById("r-mnt").checked?"maintenance contract":""].filter(Boolean).join(", ")||"equipment only"}`;
-  t+=`\nName: ${v("r-name")||"-"}\nOrganisation: ${v("r-org")||"-"}\nLocation: ${v("r-loc")||"-"}\nNeeded by: ${v("r-when")||"-"}\nContact: ${v("r-contact")||"-"}`;if(v("r-notes"))t+=`\nNotes: ${v("r-notes")}`;deliver(t)}
+  t+=`\nName: ${v("r-name")||"-"}\nOrganisation: ${v("r-org")||"-"}\nLocation: ${v("r-loc")||"-"}\nNeeded by: ${v("r-when")||"-"}\nContact: ${v("r-contact")||"-"}`;if(v("r-notes"))t+=`\nNotes: ${v("r-notes")}`;
+  logEnquiry({type:"Quote list ("+QL.length+" items)",request:QL.map(it=>`${it.name}${it.model?" – "+it.model:""} (${it.maker}) x${it.qty||1}`).join("; "),name:v("r-name"),org:v("r-org"),location:v("r-loc"),contact:v("r-contact"),notes:v("r-notes"),channel:"WhatsApp",products:QL.map(it=>it.maker+" "+(it.model||it.name)).join("; "),extras:[document.getElementById("r-inst").checked?"installation & training":"",document.getElementById("r-mnt").checked?"maintenance contract":"",v("r-when")?"needed by "+v("r-when"):""].filter(Boolean).join(", ")});deliver(t)}
 
 async function manuals(){
   const q=(qp().q||"").trim();const pop=["Mindray BeneView T5","GE Vivid","Philips IntelliVue MX450","Dräger Savina 300","Zoll AED Plus","Olympus CX23","Sysmex XN-550"];
@@ -791,7 +818,7 @@ async function manuals(){
     <form class="bigsearch" onsubmit="event.preventDefault();go('#/manuals?q='+encodeURIComponent(this.q.value))"><input name="q" value="${esc(q)}" placeholder="Brand and model, e.g. Mindray BeneView T5" autocomplete="off"><button class="btn btn-p">Find manuals</button></form>
     <div class="hints">Popular: ${pop.map(x=>`<a href="#/manuals?q=${encodeURIComponent(x)}">${esc(x)}</a>`).join("")}</div></div></section>
   <section class="block" style="padding-top:28px"><div class="wrap"><div class="grid g2" style="align-items:start">
-    <div>${q?`<div class="card"><h3 style="margin:0 0 4px">Documents for “${esc(q)}”</h3><p class="note" style="margin:0">Manuals, brochures and datasheets are sent to you by our engineers.</p>${docLinks(q)}</div><div id="man-dev" style="margin-top:16px"></div>`
+    <div>${q?`<div class="card"><h3 style="margin:0 0 4px">Documents for “${esc(q)}”</h3><p class="note" style="margin:0">Official documents link straight to the manufacturer; anything else is sent to you by our engineers.</p><div id="man-off"></div>${docLinks(q)}</div><div id="man-dev" style="margin-top:16px"></div>`
       :`<div class="card"><h3 style="margin-top:0">How to find the right manual</h3><p class="note">1. Find the <b>brand and model</b> on the rating label, usually on the back or bottom.<br>2. Search for it above.<br>3. Service manuals are often restricted to authorised engineers. If you can't find one, ask us and we'll request it from the manufacturer or distributor.</p></div>`}</div>
     <div><div class="card"><h3 style="margin-top:0">Need help with your equipment?</h3><p class="note">Our biomedical engineers service, repair and calibrate equipment, and can get service documentation from manufacturers.</p>
       <button class="btn btn-r" onclick="openQuote({title:'Request a manual',label:'Manual for ${esc(q).replace(/'/g,"")}'})">Request a manual</button> <button class="btn btn-g" onclick="openQuote({title:'Book service or repair',label:'Service / repair: ${esc(q).replace(/'/g,"")}'})">Book service or repair</button></div>
@@ -799,7 +826,8 @@ async function manuals(){
         <a class="docrow" href="https://frankshospitalworkshop.com/" target="_blank" rel="noopener"><span class="di">🛠️</span><span><b>Frank's Hospital Workshop</b><small>Free service manuals &amp; guides for biomedical engineers</small></span><span class="go">↗</span></a>
         <a class="docrow" href="https://www.who.int/teams/health-product-policy-and-standards/assistive-and-medical-technology/medical-devices" target="_blank" rel="noopener"><span class="di">🌍</span><span><b>WHO medical devices</b><small>Technical specifications &amp; maintenance guidance</small></span><span class="go">↗</span></a>
         <a class="docrow" href="https://accessgudid.nlm.nih.gov/" target="_blank" rel="noopener"><span class="di">🏛️</span><span><b>AccessGUDID</b><small>Official US device identification records</small></span><span class="go">↗</span></a></div></div></div></div></section>`;
-  if(q){const box=document.getElementById("man-dev");box.innerHTML=loading("Matching devices…");try{const j=await fda({search:"("+wordsQ(q,false)+")",limit:40});const L=dedupe(j.results||[]).slice(0,8);
+  if(q){manualsSearch(q).then(({dom,rows})=>{const el=document.getElementById("man-off");if(!el)return;el.innerHTML=rows.length?`<div style="margin:10px 0 4px"><b>Official documents from ${esc(dom)}</b></div>${rows.map(([l,u,sub])=>docRow(l,u,sub)).join("")}<div style="margin:12px 0 4px"><b>Can't see it? Request it</b></div>`:""}).catch(()=>{});
+    const box=document.getElementById("man-dev");box.innerHTML=loading("Matching devices…");try{const j=await fda({search:"("+wordsQ(q,false)+")",limit:40});const L=dedupe(j.results||[]).slice(0,8);
     box.innerHTML=L.length?`<div class="card"><h3 style="margin:0 0 4px">Matching devices</h3><p class="note" style="margin:0 0 6px">Open a device for manuals for that exact model.</p>${L.map(d=>`<a class="docrow" href="#/device/${encodeURIComponent(d.public_device_record_key)}#manuals"><span class="ti" style="width:36px;height:36px;padding:6px">${iconFor(d)}</span><span><b>${esc(devName(d))} ${esc(d.version_or_model_number||"")}</b><small>${esc(titleCase(d.company_name))}</small></span><span class="go">→</span></a>`).join("")}</div>`:""}catch(e){box.innerHTML=""}}
 }
 

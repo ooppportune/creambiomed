@@ -205,6 +205,65 @@ def meta(html, *names):
     return ""
 
 
+DOC_WORDS = re.compile(r"(user manual|operator.?s? manual|operating (manual|instructions)|instructions? for use|\bifu\b|user guide|service manual|technical manual|quick (reference|start)|brochure|data ?sheet|spec(ification)?s? sheet|product sheet|technical (data|specifications?)|catalog(ue)?)", re.I)
+
+
+class PageParser(__import__("html.parser", fromlist=["HTMLParser"]).HTMLParser):
+    """Collects 2-column spec table rows and links to manuals/brochures/datasheets."""
+    def __init__(self, base):
+        super().__init__(convert_charrefs=True)
+        self.base, self.specs, self.docs = base, [], []
+        self._row, self._cell, self._in_cell, self._a, self._skip = None, [], False, None, 0
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in ("script", "style", "noscript"):
+            self._skip += 1
+        elif tag == "tr":
+            self._row = []
+        elif tag in ("td", "th") and self._row is not None:
+            self._in_cell, self._cell = True, []
+        elif tag == "a" and a.get("href"):
+            self._a = [a["href"], []]
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript") and self._skip:
+            self._skip -= 1
+        elif tag in ("td", "th") and self._in_cell and self._row is not None:
+            self._row.append(re.sub(r"\s+", " ", "".join(self._cell)).strip())
+            self._in_cell = False
+        elif tag == "tr" and self._row is not None:
+            r = [c for c in self._row if c]
+            if len(r) == 2 and 1 < len(r[0]) <= 60 and 0 < len(r[1]) <= 160 and len(self.specs) < 20:
+                self.specs.append(r)
+            self._row = None
+        elif tag == "a" and self._a:
+            href, txt = self._a[0], re.sub(r"\s+", " ", "".join(self._a[1])).strip()
+            self._a = None
+            if href.startswith(("mailto:", "tel:", "javascript:", "#")):
+                return
+            url = urllib.parse.urljoin(self.base, href)
+            if (DOC_WORDS.search(txt) or (url.lower().split("?")[0].endswith(".pdf") and (DOC_WORDS.search(url) or txt))) and len(self.docs) < 10:
+                fname = urllib.parse.unquote(url.split("?")[0].rsplit("/", 1)[-1])[:90]
+                label = fname if (not txt or re.fullmatch(r"(download|pdf|here|click here|view|open|more|read more|download pdf)[\s.!]*", txt, re.I)) else txt[:90]
+                if url not in [d[1] for d in self.docs]:
+                    self.docs.append([label, url])
+    def handle_data(self, data):
+        if self._skip:
+            return
+        if self._in_cell:
+            self._cell.append(data)
+        if self._a is not None:
+            self._a[1].append(data)
+
+
+def page_extras(html_text, url):
+    p = PageParser(url)
+    try:
+        p.feed(html_text)
+    except Exception:
+        pass
+    return p.specs, p.docs
+
+
 def crawl_domain(dom, old):
     import urllib.robotparser
     base = "https://www." + dom if dom.count(".") == 1 else "https://" + dom
@@ -233,6 +292,7 @@ def crawl_domain(dom, old):
             queue += subs[:30]
         else:
             urls += [unescape(l) for l in locs]
+    sm_docs = [u for u in dict.fromkeys(urls) if u.lower().split("?")[0].endswith(".pdf") and DOC_WORDS.search(urllib.parse.unquote(u).replace("-", " ").replace("_", " "))][:500]
     urls = [u for u in dict.fromkeys(urls) if "product" in u.lower() and not NOT_PRODUCT.search(urllib.parse.urlparse(u).path)]
     en = [u for u in urls if re.search(r"/(en|en-us|en-gb|en-int|us|global|int|ww)(/|$)", urllib.parse.urlparse(u).path, re.I)]
     if len(en) >= 10:
@@ -256,12 +316,13 @@ def crawl_domain(dom, old):
         desc = meta(h, "og:description", "description", "twitter:description")
         if img and not img.startswith("http"):
             img = urllib.parse.urljoin(u, img)
-        if title and img:
-            out[u] = [u, re.sub(r"\s+", " ", title)[:140], img, re.sub(r"\s+", " ", desc)[:220], today]
+        specs, docs = page_extras(h, u)
+        if title and (img or specs or docs):
+            out[u] = [u, re.sub(r"\s+", " ", title)[:140], img or "", re.sub(r"\s+", " ", desc)[:220], today, specs, docs]
         time.sleep(0.6)
     keep = set(urls) | set(have)
     items = [i for i in out.values() if i[0] in keep]
-    return items, len(urls)
+    return items, len(urls), sm_docs
 
 
 def sync_catalogs(partners=None):
@@ -271,15 +332,16 @@ def sync_catalogs(partners=None):
         path = f"{OUT}/catalog/{dom}.json"
         try:
             old = json.load(open(path)).get("items", [])
+            old = [i for i in old if len(i) >= 5]
         except Exception:
             old = []
         try:
-            items, found = crawl_domain(dom, old)
+            items, found, sm_docs = crawl_domain(dom, old)
         except Exception as e:
             print(f"catalog {dom} failed: {e}")
             return dom, len(old)
-        if items:
-            write(path, {"domain": dom, "items": items})
+        if items or sm_docs:
+            write(path, {"domain": dom, "items": items, "docs": [[urllib.parse.unquote(u.rsplit("/", 1)[-1])[:90], u] for u in sm_docs]})
         print(f"catalog {dom}: {len(items)} products ({found} product URLs in sitemap)", flush=True)
         return dom, len(items)
     with ThreadPoolExecutor(max_workers=12) as ex:
