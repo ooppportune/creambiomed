@@ -194,7 +194,18 @@ ${prods.length ? `<div class="card"><h2>Products</h2><ul class="list">${prods.ma
     write(`c/${id}.html`, page({ title: `${si.name} — compare models & manufacturers | Cream Biomed`, desc: `${si.desc}. Compare ${si.products.length} market-ready ${si.name.toLowerCase()} from ${mk.length}+ manufacturers. Quotes, installation and maintenance from Cream Biomed.`, canon: `/c/${id}.html`, crumbs: `<a href="/">Home</a> / <a href="/c/">Categories</a> / ${esc(si.name)}`, body }));
     urls.push(`/c/${id}.html`);
   }
-  write("c/index.html", page({ title: "Medical equipment categories | Cream Biomed", desc: "Browse medical equipment by hospital department: monitoring, imaging, respiratory, surgery, emergency, maternal, laboratory, sterilisation, dental, eye & ENT, furniture and dialysis.", canon: "/c/", crumbs: `<a href="/">Home</a> / Categories`, body: DEPTS.map((dp) => `<div class="card"><h2>${esc(dp.name)}</h2><p class="note">${esc(dp.desc)}</p><ul class="list">${dp.subs.map((s) => `<li>${subLink(s[0])} <span class="note">· ${subInfo[s[0]].products.length} products</span></li>`).join("")}</ul></div>`).join("") }));
+  let who = [];
+  try { who = JSON.parse(fs.readFileSync("data/who_ivd.json", "utf8")).rows || []; } catch {}
+  if (who.length) {
+    const byD = {};
+    for (const r of who) (byD[r[6] || "Other"] ||= []).push(r);
+    const body = `<div class="card"><span class="tag">Lab Reagents &amp; Consumables</span><h1>WHO-prequalified diagnostics</h1><p>${who.length} in vitro diagnostics assessed by the World Health Organization and found acceptable, in principle, for procurement by UN agencies: malaria, HIV, hepatitis, syphilis, HPV, TB and more. Cream Biomed sources these tests and checks national registration.</p><p><a class="btn btn-r" href="${waLink("Hello Cream Biomed, I need a quote for WHO-prequalified diagnostics.")}" rel="nofollow">Get a quote</a><a class="btn btn-g" href="/#/who">Search &amp; filter the WHO list</a></p></div>` +
+      Object.keys(byD).sort().map((d) => `<div class="card"><h2>${esc(d)}</h2><table><tr><th>Product</th><th>Manufacturer</th><th>Assay format</th></tr>${byD[d].map((r) => `<tr><td>${esc(r[0])}</td><td>${esc(r[5])}</td><td>${esc(r[3])}</td></tr>`).join("")}</table></div>`).join("") +
+      `<p class="note">Source: <a href="https://extranet.who.int/prequal/vitro-diagnostics/prequalified/in-vitro-diagnostics" rel="noopener" target="_blank">WHO list of prequalified in vitro diagnostic products</a>. Inclusion does not imply WHO endorsement or national approval.</p>`;
+    write("c/who.html", page({ title: "WHO-prequalified diagnostics: malaria, HIV, hepatitis, syphilis tests | Cream Biomed", desc: `${who.length} WHO-prequalified in vitro diagnostics, including malaria and HIV rapid tests, from manufacturers worldwide. Quotes and sourcing by Cream Biomed.`, canon: "/c/who.html", crumbs: `<a href="/">Home</a> / <a href="/c/">Categories</a> / WHO-prequalified diagnostics`, body }));
+    urls.push("/c/who.html");
+  }
+  write("c/index.html", page({ title: "Medical equipment categories | Cream Biomed", desc: "Browse medical equipment by hospital department: monitoring, imaging, respiratory, surgery, emergency, maternal, laboratory, sterilisation, dental, eye & ENT, furniture and dialysis.", canon: "/c/", crumbs: `<a href="/">Home</a> / Categories`, body: (who.length ? `<div class="card"><h2><a href="/c/who.html">WHO-prequalified diagnostics</a></h2><p class="note">${who.length} malaria, HIV, hepatitis, syphilis and other tests assessed by WHO.</p></div>` : "") + DEPTS.map((dp) => `<div class="card"><h2>${esc(dp.name)}</h2><p class="note">${esc(dp.desc)}</p><ul class="list">${dp.subs.map((s) => `<li>${subLink(s[0])} <span class="note">· ${subInfo[s[0]].products.length} products</span></li>`).join("")}</ul></div>`).join("") }));
 
   // sitemaps (max 50k URLs each)
   const today = new Date().toISOString().slice(0, 10);

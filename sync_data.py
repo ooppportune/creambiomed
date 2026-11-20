@@ -359,10 +359,39 @@ def sync_catalogs(partners=None):
     return {"catalog_domains": len(idx), "catalog_products": sum(idx.values())}
 
 
+# ---------------------------------------------------------------- WHO prequalified IVDs
+WHO_IVD_CSV = "https://extranet.who.int/prequal/vitro-diagnostics/prequalified/in-vitro-diagnostics/export?page&_format=csv"
+
+
+def sync_who(partners=None):
+    import csv, io
+    txt = fetch_text(WHO_IVD_CSV, timeout=60)
+    rows = list(csv.reader(io.StringIO(txt)))
+    head = [h.strip().lower() for h in rows[0]]
+    def col(*names):
+        for n in names:
+            for i, h in enumerate(head):
+                if n in h:
+                    return i
+        return -1
+    ix = [col("product name"), col("product code"), col("who product id"), col("assay format"), col("regulatory"), col("manufacturer"), col("pathogen", "disease"), col("year")]
+    out = []
+    for r in rows[1:]:
+        g = lambda i: re.sub(r"\s+", " ", r[i]).strip() if 0 <= i < len(r) else ""
+        rec = [g(i) for i in ix]
+        if rec[0] and rec[5]:
+            rec[5] = re.sub(r"\s*\(English version.*?\)", "", rec[5])
+            out.append(rec)
+    if len(out) < 20:
+        raise RuntimeError(f"WHO list too short ({len(out)} rows)")
+    write(f"{OUT}/who_ivd.json", {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "source": "WHO list of prequalified in vitro diagnostic products", "rows": out})
+    return {"who_ivd": len(out)}
+
+
 def main():
     partners = defaultdict(list)
     meta = {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "sources": {}}
-    for fn in (sync_eudamed, sync_rwanda, sync_catalogs):
+    for fn in (sync_who, sync_eudamed, sync_rwanda, sync_catalogs):
         try:
             meta["sources"].update(fn(partners) or {})
         except Exception as e:
