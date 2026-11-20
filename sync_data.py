@@ -11,7 +11,8 @@ static site reads:
 Only organisation-level data is kept. Personal names (e.g. PRRC or technician
 names), personal e-mails and phone numbers are never written.
 """
-import json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
+import json, os, re, sys, time, unicodedata, urllib.parse, urllib.request, urllib.error
+from html import unescape
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -171,10 +172,128 @@ def sync_rwanda(partners):
     return {"rw_error": "; ".join(errors)[:300]}
 
 
+
+# ---------------------------------------------------------------- Manufacturer catalogues
+# Reads manufacturers' public sitemaps and product pages (respecting robots.txt) and keeps,
+# per product page: URL, title, the page's own preview image URL (not copied; displayed from
+# the manufacturer's server with attribution), and a short description excerpt.
+CATALOG_DOMAINS = ["abbott.com", "agfa.com", "ambu.com", "baxter.com", "bbraun.com", "bd.com", "beckmancoulter.com", "belimed.com", "bionetus.com", "blt.com.cn", "cardinalhealth.com", "carestream.com", "chison.com", "comen.com", "contecmed.com", "dentsplysirona.com", "diagnostics.roche.com", "draeger.com", "edan.com", "esaote.com", "fphcare.com", "freseniusmedicalcare.com", "fujifilm.com", "gehealthcare.com", "getinge.com", "global.medical.canon", "haag-streit.com", "hamilton-medical.com", "healthcare.nikon.com", "heine.com", "hillrom.com", "hologic.com", "icumedical.com", "intersurgical.com", "invacare.com", "karlstorz.com", "keelerglobal.com", "laerdal.com", "leica-microsystems.com", "masimo.com", "medtronic.com", "midmark.com", "mindray.com", "natus.com", "nihonkohden.com", "nipro-group.com", "olympus-global.com", "penlon.com", "philips.com", "planmeca.com", "resmed.com", "samsunghealthcare.com", "schiller.ch", "siemens-healthineers.com", "siui.com", "sonoscape.com", "spacelabshealthcare.com", "steris.com", "stryker.com", "sysmex.com", "topconhealthcare.com", "tuttnauer.com", "vyaire.com", "wdm.com.cn", "yuwell.com", "zeiss.com", "zoll.com"]
+BOT_UA = "CreamBiomedBot/1.0 (+https://ooppportune.github.io/creambiomed/#/about)"
+PER_RUN = 250          # new or refreshed pages per domain per run
+REFRESH_DAYS = 30
+NOT_PRODUCT = re.compile(r"(^|/|-)(news|blogs?|press|events?|careers?|jobs?|investors?|privacy|cookies?|terms|contact|login|search|tags?|category|webinars?|videos?|case-stud\w*|story|stories|about|esg|legal)(-|/|$)", re.I)
+
+
+def fetch_text(url, timeout=30, limit=3_000_000):
+    req = urllib.request.Request(url, headers={"User-Agent": BOT_UA, "Accept": "text/html,application/xml,*/*"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = r.read(limit)
+        enc = r.headers.get_content_charset() or "utf-8"
+    if url.endswith(".gz") or data[:2] == b"\x1f\x8b":
+        import gzip
+        data = gzip.decompress(data)
+    return data.decode(enc, "replace")
+
+
+def meta(html, *names):
+    for n in names:
+        for pat in (r'<meta[^>]+(?:property|name)=["\']%s["\'][^>]*content=["\']([^"\']+)' % re.escape(n),
+                    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*(?:property|name)=["\']%s["\']' % re.escape(n)):
+            m = re.search(pat, html, re.I)
+            if m:
+                return unescape(m.group(1)).strip()
+    return ""
+
+
+def crawl_domain(dom, old):
+    import urllib.robotparser
+    base = "https://www." + dom if dom.count(".") == 1 else "https://" + dom
+    rp = urllib.robotparser.RobotFileParser()
+    sitemaps = []
+    try:
+        txt = fetch_text(base + "/robots.txt", timeout=20)
+        rp.parse(txt.splitlines())
+        sitemaps = [l.split(":", 1)[1].strip() for l in txt.splitlines() if l.lower().startswith("sitemap:")]
+    except Exception:
+        rp.parse([])
+    sitemaps += [base + "/sitemap.xml", base + "/sitemap_index.xml", base + "/en/sitemap.xml", base + "/sitemap-index.xml"]
+    urls, seen_sm, queue = [], set(), list(dict.fromkeys(sitemaps))
+    while queue and len(seen_sm) < 40 and len(urls) < 20000:
+        sm = queue.pop(0)
+        if sm in seen_sm:
+            continue
+        seen_sm.add(sm)
+        try:
+            x = fetch_text(sm)
+        except Exception:
+            continue
+        locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", x)
+        if "<sitemapindex" in x:
+            subs = [l for l in locs if re.search(r"product|en|page|post-type|default|sitemap", l, re.I)] or locs
+            queue += subs[:30]
+        else:
+            urls += [unescape(l) for l in locs]
+    urls = [u for u in dict.fromkeys(urls) if "product" in u.lower() and not NOT_PRODUCT.search(urllib.parse.urlparse(u).path)]
+    en = [u for u in urls if re.search(r"/(en|en-us|en-gb|en-int|us|global|int|ww)(/|$)", urllib.parse.urlparse(u).path, re.I)]
+    if len(en) >= 10:
+        urls = en
+    urls.sort(key=lambda u: -urllib.parse.urlparse(u).path.count("/"))
+    have = {i[0]: i for i in old}
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    todo = [u for u in urls if u not in have][:PER_RUN]
+    stale = sorted((i for i in old if i[4] < (datetime.now(timezone.utc).replace(tzinfo=None) - __import__("datetime").timedelta(days=REFRESH_DAYS)).strftime("%Y-%m-%d")), key=lambda i: i[4])
+    todo += [i[0] for i in stale][: max(0, PER_RUN - len(todo))]
+    out = dict(have)
+    for u in todo:
+        if not rp.can_fetch(BOT_UA, u):
+            continue
+        try:
+            h = fetch_text(u, timeout=25)
+        except Exception:
+            continue
+        title = meta(h, "og:title", "twitter:title") or unescape((re.search(r"<title[^>]*>([^<]+)", h, re.I) or [None, ""])[1]).strip()
+        img = meta(h, "og:image", "og:image:url", "twitter:image")
+        desc = meta(h, "og:description", "description", "twitter:description")
+        if img and not img.startswith("http"):
+            img = urllib.parse.urljoin(u, img)
+        if title and img:
+            out[u] = [u, re.sub(r"\s+", " ", title)[:140], img, re.sub(r"\s+", " ", desc)[:220], today]
+        time.sleep(0.6)
+    keep = set(urls) | set(have)
+    items = [i for i in out.values() if i[0] in keep]
+    return items, len(urls)
+
+
+def sync_catalogs():
+    from concurrent.futures import ThreadPoolExecutor
+    idx = {}
+    def one(dom):
+        path = f"{OUT}/catalog/{dom}.json"
+        try:
+            old = json.load(open(path)).get("items", [])
+        except Exception:
+            old = []
+        try:
+            items, found = crawl_domain(dom, old)
+        except Exception as e:
+            print(f"catalog {dom} failed: {e}")
+            return dom, len(old)
+        if items:
+            write(path, {"domain": dom, "items": items})
+        print(f"catalog {dom}: {len(items)} products ({found} product URLs in sitemap)", flush=True)
+        return dom, len(items)
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        for dom, n in ex.map(one, CATALOG_DOMAINS):
+            if n:
+                idx[dom] = n
+    write(f"{OUT}/catalog/index.json", {"domains": idx})
+    return {"catalog_domains": len(idx), "catalog_products": sum(idx.values())}
+
+
 def main():
     partners = defaultdict(list)
     meta = {"updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "sources": {}}
-    for fn in (sync_eudamed, sync_rwanda):
+    for fn in (sync_eudamed, sync_rwanda, sync_catalogs):
         try:
             meta["sources"].update(fn(partners) or {})
         except Exception as e:
