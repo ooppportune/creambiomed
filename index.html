@@ -22,7 +22,7 @@ header.top{background:var(--dark);color:#fff;position:sticky;top:0;z-index:30}
 .brand:hover{text-decoration:none}.brand small{display:block;font-weight:500;color:#aab4dc;font-size:11px;letter-spacing:0}
 .brand .logo{background:#fff;border-radius:50%;padding:3px;display:grid}
 .nav nav{display:flex;gap:4px;align-items:center}
-.nav nav a{color:#dfe4f7;font-weight:500;font-size:14px;padding:8px 10px;border-radius:8px}
+.nav nav a{color:#dfe4f7;font-weight:500;font-size:14px;padding:8px 10px;border-radius:8px;white-space:nowrap}
 .nav nav a:hover,.nav nav a.active{background:rgba(255,255,255,.1);color:#fff;text-decoration:none}
 .hsearch{margin-left:auto;display:flex;align-items:center;background:#fff;border-radius:999px;padding:3px 4px 3px 14px;width:300px}
 .hsearch input{border:0;outline:0;flex:1;min-width:0;font-size:14px;padding:6px 0}
@@ -230,7 +230,7 @@ footer .disc{border-top:1px solid rgba(255,255,255,.12);margin-top:26px;padding-
 const CONFIG={ whatsapp:"", /* digits only, e.g. "256700000000" */ messenger:"https://m.me/creambiomedscientificltd", facebook:"https://www.facebook.com/creambiomedscientificltd" };
 /* ====================== */
 const API="https://api.fda.gov/device/udi.json";
-const ACTIVE='commercial_distribution_status:"In Commercial Distribution"';
+const ACTIVE='(commercial_distribution_status:"In Commercial Distribution" AND NOT commercial_distribution_status:not)';
 const EXQ=' AND NOT gmdn_terms.implantable:true AND NOT gmdn_terms.name:(electrode OR handpiece OR cable OR lead OR probe OR cuff OR sensor OR tubing OR circuit OR filter OR mask OR kit OR battery OR adaptor OR adapter OR holder OR bracket OR forceps OR accessory OR transducer OR applicator OR tip OR blade OR needle OR catheter OR cannula OR dressing OR strip OR reagent OR control OR calibrator OR software OR cart OR trolley OR mount OR pad OR paddle OR clip OR cover OR sheath OR drape OR insert OR replacement OR spare OR set OR bag OR container OR liner OR scissors OR switch OR coil OR mattress OR cushion OR rack OR tray OR slide OR coverslip OR solution OR concentrate OR mould OR marker OR dialyser)';
 const app=document.getElementById("app");
 document.getElementById("yr").textContent=new Date().getFullYear();
