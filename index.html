@@ -257,8 +257,10 @@ const IC={
  eye:S('<path d="M4 32s10-16 28-16 28 16 28 16-10 16-28 16S4 32 4 32z"/><circle cx="32" cy="32" r="9"/><circle cx="32" cy="32" r="3" stroke="#6bd4ff"/>'),
  furniture:S('<path d="M6 20v32M58 34v18M6 42h52M6 34h52"/><rect x="10" y="26" width="12" height="8" rx="3"/><path d="M24 34v-6h26c4 0 8 3 8 6"/><circle cx="14" cy="56" r="2"/><circle cx="52" cy="56" r="2"/>'),
  renal:S('<path d="M26 8c-10 0-16 10-16 22s6 26 16 26c7 0 8-6 8-12 0-4-3-6-3-10s3-6 3-10c0-8-1-16-8-16z"/><path d="M40 20h10v10M40 44h10V34" stroke="#6bd4ff"/><path d="M50 30v4" stroke="#6bd4ff"/>'),
+ reagents:S('<path d="M14 8v34a6 6 0 0 0 12 0V8M11 8h18M38 8v34a6 6 0 0 0 12 0V8M35 8h18"/><path d="M14 30h12M38 24h12" stroke="#6bffb0"/><path d="M6 58h52"/>'),
  cross:S('<path d="M24 8h16v16h16v16H40v16H24V40H8V24h16z"/>')
 };
+const RNC=" AND NOT gmdn_terms.name:(control OR calibrator OR rapid OR immunochromatographic)";
 const G=w=>w.map(x=>`gmdn_terms.name:${x}`).join(" AND ");
 const DEPTS=[
  {id:"monitoring",name:"Patient Monitoring",desc:"Bedside monitors, pulse oximeters, blood pressure monitors, ECG machines and thermometers.",subs:[
@@ -304,6 +306,17 @@ const DEPTS=[
   ["centri","Centrifuges",G(["centrifuge"]),"General and haematocrit centrifuges"],
   ["micro","Microscopes",G(["microscope"])+" AND NOT gmdn_terms.name:surgical","Laboratory light microscopes"],
   ["gluc","Glucose meters",G(["glucose","monitoring","system"]),"Point-of-care glucose"]]},
+ {id:"reagents",name:"Lab Reagents & Consumables",noExq:true,desc:"IVD reagents, rapid tests, controls, culture media, stains, blood collection tubes and laboratory consumables.",subs:[
+  ["chemr","Clinical chemistry reagents",'gmdn_terms.name:IVD AND gmdn_terms.name:(spectrophotometry OR enzymatic OR colorimetric OR "ion selective" OR potentiometric)'+RNC,"Liver, renal, lipid, glucose and electrolyte reagents"],
+  ["immr","Immunoassay reagents",'gmdn_terms.name:IVD AND gmdn_terms.name:(chemiluminescent OR immunoassay OR "enzyme immunoassay" OR fluorescent)'+RNC,"Hormones, tumour markers, infectious serology, ELISA"],
+  ["hemr","Haematology & coagulation reagents",'gmdn_terms.name:IVD AND gmdn_terms.name:(coagulation OR prothrombin OR thromboplastin OR haematology OR "blood grouping" OR "blood group" OR haemoglobin OR "cell count")'+RNC+' AND NOT gmdn_terms.name:(analyser OR analyzer)',"Coagulation, HbA1c, blood grouping, cell count reagents"],
+  ["rdt","Rapid diagnostic tests",'gmdn_terms.name:IVD AND gmdn_terms.name:(rapid OR immunochromatographic)',"Malaria, HIV, pregnancy, drugs of abuse and other rapid kits"],
+  ["pcr","Molecular & PCR",'gmdn_terms.name:IVD AND gmdn_terms.name:("nucleic acid" OR NAT)'+RNC+' AND NOT gmdn_terms.name:(analyser OR analyzer OR instrument)',"PCR assays, nucleic acid extraction kits"],
+  ["micror","Microbiology media & AST",'gmdn_terms.name:("culture medium" OR "antimicrobial susceptibility" OR "microorganism identification") AND NOT gmdn_terms.name:("ex vivo" OR "cell culture" OR embryo OR IVF)',"Agar and broth media, identification and susceptibility testing"],
+  ["histo","Histology & cytology stains",'gmdn_terms.name:IVD AND gmdn_terms.name:(stain OR immunohistochemistry)'+RNC,"Biological stains and immunohistochemistry antibodies"],
+  ["qc","Controls & calibrators",'gmdn_terms.name:IVD AND gmdn_terms.name:(control OR calibrator)',"Quality control materials and calibrators"],
+  ["tube","Blood collection",'gmdn_terms.name:("blood collection tube" OR evacuated OR "blood collection")',"Vacuum tubes, needles, holders and collection sets"],
+  ["labc","Laboratory consumables",'gmdn_terms.name:(pipette OR "specimen container" OR cuvette OR "microscope slide" OR "culture dish" OR "specimen collection")',"Pipettes, specimen containers, slides, cuvettes"]]},
  {id:"sterile",name:"Sterilisation & Infection Control",desc:"Steam autoclaves, low-temperature sterilisers and washer-disinfectors.",subs:[
   ["steam","Steam sterilisers (autoclaves)",G(["steam","sterilizer"]),"Benchtop and large autoclaves"],
   ["lowt","Low-temperature sterilisers","(gmdn_terms.name:sterilizer AND (gmdn_terms.name:hydrogen OR gmdn_terms.name:ethylene OR gmdn_terms.name:plasma OR gmdn_terms.name:peroxide))","EO and hydrogen peroxide"],
@@ -328,6 +341,7 @@ const DEPTS=[
   ["tens","Electrotherapy (TENS)",G(["transcutaneous","electrical"]),"Nerve and muscle stimulators"],
   ["pt","Therapeutic ultrasound",G(["physical","therapy","ultrasound"]),"Physiotherapy ultrasound"]]}
 ];
+const NOEXQ=new Set();DEPTS.forEach(d=>{if(d.noExq)d.subs.forEach(s=>NOEXQ.add(s[2]))});
 const SUB={};DEPTS.forEach(d=>d.subs.forEach(s=>SUB[s[0]]={id:s[0],name:s[1],q:s[2],desc:s[3],dept:d}));
 const DEPT=Object.fromEntries(DEPTS.map(d=>[d.id,d]));
 const UNITS=[
@@ -335,7 +349,7 @@ const UNITS=[
  {id:"theatre",name:"Operating Theatre",icon:"surgery",desc:"Equipment for each operating room",items:[["anaes","With integrated ventilator and gas monitoring"],["mon","Anaesthesia monitoring"],["esu","Monopolar and bipolar"],["orl","Main and satellite light"],["ort","Matched to the procedures you do"],["suction","Surgical suction"],["defib","Shared between theatres"],["smic","For ENT, eye or neurosurgery"],["steam","In CSSD for instrument sterilisation"]]},
  {id:"maternity",name:"Maternity & Labour Ward",icon:"maternal",desc:"Labour suites and postnatal ward",items:[["fetal","Foetal Doppler and CTG monitors"],["bp","Maternal blood pressure"],["spo2","Maternal and newborn oximetry"],["warm","Newborn resuscitation area"],["resus","Adult and neonatal sizes"],["suction","Maternal and newborn suction"],["us","Obstetric ultrasound"],["incu","For small and sick babies"]]},
  {id:"nicu",name:"Neonatal Unit (NICU)",icon:"maternal",desc:"Special care baby unit",items:[["incu","Per cot space"],["warm","Admission and procedures"],["photo","Neonatal jaundice"],["cpap","Bubble or device CPAP"],["spo2","Neonatal sensors"],["syr","Neonatal infusions"],["suction","Low-pressure suction"],["resus","Neonatal resuscitator"]]},
- {id:"lab",name:"Medical Laboratory",icon:"lab",desc:"Hospital or health-centre laboratory",items:[["hema","Complete blood count"],["chem","Renal, liver and lipid panels"],["immuno","Hormones, tumour markers, serology"],["centri","General and microhaematocrit"],["micro","Microscopy for parasitology and TB"],["gluc","Point-of-care testing"],["steam","Waste decontamination"]]},
+ {id:"lab",name:"Medical Laboratory",icon:"lab",desc:"Hospital or health-centre laboratory",items:[["hema","Complete blood count"],["chem","Renal, liver and lipid panels"],["immuno","Hormones, tumour markers, serology"],["centri","General and microhaematocrit"],["micro","Microscopy for parasitology and TB"],["gluc","Point-of-care testing"],["steam","Waste decontamination"],["chemr","Reagents for your chemistry analyser"],["hemr","Coagulation and HbA1c reagents"],["rdt","Malaria, HIV and other rapid tests"],["qc","Daily quality control"],["tube","Vacuum tubes and needles"],["labc","Pipettes, slides and containers"]]},
  {id:"imaging",name:"Radiology & Imaging",icon:"imaging",desc:"Imaging department",items:[["xray","General radiography"],["us","General and obstetric ultrasound"],["ct","Cross-sectional imaging"],["mri","Advanced imaging"],["mammo","Breast screening"]]},
  {id:"opd",name:"Outpatient Clinic / Health Centre",icon:"cross",desc:"Consultation and treatment rooms",items:[["bp","One per consultation room"],["thermo","Infrared or electronic"],["spo2","Fingertip or handheld"],["ecg","Resting 12-lead"],["oto","Ear examination"],["ophth","Eye examination"],["exam","Per consultation room"],["gluc","Point-of-care glucose"],["neb","Treatment room"],["steam","Benchtop autoclave"]]},
  {id:"emergency",name:"Emergency Department",icon:"emergency",desc:"Resuscitation and treatment bays",items:[["defib","Monitor-defibrillator and AED"],["mon","Resuscitation bays"],["vent","Transport ventilator"],["suction","Per bay"],["resus","Adult and paediatric"],["inf","Fluid resuscitation"],["o2","Backup oxygen supply"],["stretch","Transport stretchers"],["ecg","12-lead"]]},
@@ -389,7 +403,7 @@ async function euMaker(name){const k=normName(name);if(!k)return{loaded:false};c
   let hit=sh.rows.find(r=>normName(r[1])===k);if(!hit){const two=k.split(" ").slice(0,2).join(" ");const c=sh.rows.filter(r=>normName(r[1]).startsWith(two));if(c.length===1)hit=c[0]}
   return{loaded:true,hit}}
 /* Official manufacturer websites: curated list first, then EUDAMED-registered website */
-const MAKER_SITES={mindray:"mindray.com",philips:"philips.com",ge:"gehealthcare.com",drager:"draeger.com",draeger:"draeger.com",draegerwerk:"draeger.com",nihon:"nihonkohden.com",siemens:"siemens-healthineers.com",zoll:"zoll.com",edan:"edan.com",medtronic:"medtronic.com",covidien:"medtronic.com",becton:"bd.com",baxter:"baxter.com",hill:"hillrom.com",welch:"hillrom.com",b:"bbraun.com",braun:"bbraun.com",steris:"steris.com",stryker:"stryker.com",hamilton:"hamilton-medical.com",getinge:"getinge.com",maquet:"getinge.com",canon:"global.medical.canon",toshiba:"global.medical.canon",fujifilm:"fujifilm.com",samsung:"samsunghealthcare.com",esaote:"esaote.com",schiller:"schiller.ch",masimo:"masimo.com",icu:"icumedical.com",smiths:"icumedical.com",natus:"natus.com",karl:"karlstorz.com",olympus:"olympus-global.com",hologic:"hologic.com",carestream:"carestream.com",agfa:"agfa.com",sysmex:"sysmex.com",beckman:"beckmancoulter.com",roche:"diagnostics.roche.com",abbott:"abbott.com",fresenius:"freseniusmedicalcare.com",nipro:"nipro-group.com",resmed:"resmed.com",fisher:"fphcare.com",invacare:"invacare.com",tuttnauer:"tuttnauer.com",belimed:"belimed.com",heine:"heine.com",keeler:"keelerglobal.com",topcon:"topconhealthcare.com",zeiss:"zeiss.com",haag:"haag-streit.com",leica:"leica-microsystems.com",nikon:"healthcare.nikon.com",biolight:"blt.com.cn",comen:"comen.com",contec:"contecmed.com",yuwell:"yuwell.com",mortara:"hillrom.com",spacelabs:"spacelabshealthcare.com",cardinal:"cardinalhealth.com",midmark:"midmark.com",dentsply:"dentsplysirona.com",sirona:"dentsplysirona.com",planmeca:"planmeca.com",carestation:"gehealthcare.com",laerdal:"laerdal.com",ambu:"ambu.com",vyaire:"vyaire.com",carefusion:"bd.com",intersurgical:"intersurgical.com",chison:"chison.com",sonoscape:"sonoscape.com",wandong:"wdm.com.cn",siui:"siui.com",bionet:"bionetus.com",penlon:"penlon.com"};
+const MAKER_SITES={mindray:"mindray.com",philips:"philips.com",ge:"gehealthcare.com",drager:"draeger.com",draeger:"draeger.com",draegerwerk:"draeger.com",nihon:"nihonkohden.com",siemens:"siemens-healthineers.com",zoll:"zoll.com",edan:"edan.com",medtronic:"medtronic.com",covidien:"medtronic.com",becton:"bd.com",baxter:"baxter.com",hill:"hillrom.com",welch:"hillrom.com",b:"bbraun.com",braun:"bbraun.com",steris:"steris.com",stryker:"stryker.com",hamilton:"hamilton-medical.com",getinge:"getinge.com",maquet:"getinge.com",canon:"global.medical.canon",toshiba:"global.medical.canon",fujifilm:"fujifilm.com",samsung:"samsunghealthcare.com",esaote:"esaote.com",schiller:"schiller.ch",masimo:"masimo.com",icu:"icumedical.com",smiths:"icumedical.com",natus:"natus.com",karl:"karlstorz.com",olympus:"olympus-global.com",hologic:"hologic.com",carestream:"carestream.com",agfa:"agfa.com",sysmex:"sysmex.com",beckman:"beckmancoulter.com",roche:"diagnostics.roche.com",abbott:"abbott.com",fresenius:"freseniusmedicalcare.com",nipro:"nipro-group.com",resmed:"resmed.com",fisher:"fphcare.com",invacare:"invacare.com",tuttnauer:"tuttnauer.com",belimed:"belimed.com",heine:"heine.com",keeler:"keelerglobal.com",topcon:"topconhealthcare.com",zeiss:"zeiss.com",haag:"haag-streit.com",leica:"leica-microsystems.com",nikon:"healthcare.nikon.com",biolight:"blt.com.cn",comen:"comen.com",contec:"contecmed.com",yuwell:"yuwell.com",mortara:"hillrom.com",spacelabs:"spacelabshealthcare.com",cardinal:"cardinalhealth.com",midmark:"midmark.com",dentsply:"dentsplysirona.com",sirona:"dentsplysirona.com",planmeca:"planmeca.com",carestation:"gehealthcare.com",laerdal:"laerdal.com",ambu:"ambu.com",vyaire:"vyaire.com",carefusion:"bd.com",intersurgical:"intersurgical.com",chison:"chison.com",sonoscape:"sonoscape.com",wandong:"wdm.com.cn",biomerieux:"biomerieux.com",remel:"thermofisher.com",oxoid:"thermofisher.com",thermo:"thermofisher.com",phadia:"thermofisher.com",wondfo:"wondfo.com",sarstedt:"sarstedt.com",greiner:"gbo.com",hardy:"hardydiagnostics.com",randox:"randox.com",diasorin:"diasorin.com",qiagen:"qiagen.com",cepheid:"cepheid.com",horiba:"horiba.com",sekisui:"sekisuidiagnostics.com",quidel:"quidelortho.com",ortho:"quidelortho.com",werfen:"werfen.com",instrumentation:"werfen.com",stago:"stago.com",ventana:"diagnostics.roche.com",snibe:"snibe.com",autobio:"autobio.com.cn",dirui:"dirui.com.cn",erba:"erbamannheim.com",siui:"siui.com",bionet:"bionetus.com",penlon:"penlon.com"};
 function cleanSite(w){w=String(w||"").trim().replace(/^https?\/\/:?/i,"https://").replace(/^http\/\/:/i,"https://");if(!w)return"";if(!/^https?:\/\//i.test(w))w="https://"+w;try{const h=new URL(w).hostname.replace(/^www\./,"");return /\./.test(h)?h:""}catch(e){return""}}
 async function makerSite(name){const k=normName(name).split(" ");const first=k[0]==="shenzhen"||k[0]==="beijing"||k[0]==="guangdong"||k[0]==="jiangsu"||k[0]==="shanghai"||k[0]==="zhejiang"?k[1]:k[0];
   if(first&&MAKER_SITES[first])return MAKER_SITES[first];
@@ -445,7 +459,7 @@ const CTRY=store.get("cb_ctry",{});
 function devName(d){return d.brand_name||d.gmdn_terms?.[0]?.name||"Medical device"}
 function devClass(d){const c=d.product_codes?.[0]?.openfda?.device_class;return c&&/^[123]$/.test(c)?c:null}
 function primaryDI(d){return(d.identifiers||[]).find(i=>i.type==="Primary")?.id||d.identifiers?.[0]?.id||""}
-const KW={monitoring:["monitor","oximeter","sphygmo","electrocardio","thermometer"],imaging:["ultrasound","x-ray","ct ","mri","mammo","tomograph"],respiratory:["ventilator","anaesthesia","oxygen","cpap","bpap","suction","nebuli"],surgery:["electrosurg","operating","surgical","scope"],emergency:["defibrill","infusion","syringe","resuscitat"],maternal:["infant","foetal","phototherapy","breast"],lab:["analyser","centrifuge","microscope","glucose","ivd"],sterile:["steril","washer"],dental:["dental"],eye:["ophthalm","slit","tonometer","otoscope","audiometer"],furniture:["bed","stretcher","wheelchair","table"],renal:["dialysis","transcutaneous","therapy"]};
+const KW={monitoring:["monitor","oximeter","sphygmo","electrocardio","thermometer"],imaging:["ultrasound","x-ray","ct ","mri","mammo","tomograph"],respiratory:["ventilator","anaesthesia","oxygen","cpap","bpap","suction","nebuli"],surgery:["electrosurg","operating","surgical","scope"],emergency:["defibrill","infusion","syringe","resuscitat"],maternal:["infant","foetal","phototherapy","breast"],reagents:["reagent","rapid","kit","control","calibrator","culture medium","stain","blood collection","pipette","specimen","cuvette","slide","nucleic"],lab:["analyser","centrifuge","microscope","glucose","ivd"],sterile:["steril","washer"],dental:["dental"],eye:["ophthalm","slit","tonometer","otoscope","audiometer"],furniture:["bed","stretcher","wheelchair","table"],renal:["dialysis","transcutaneous","therapy"]};
 function iconFor(d){const t=((d.gmdn_terms?.[0]?.name||"")+" "+(d.brand_name||"")).toLowerCase();for(const [k,ws] of Object.entries(KW)) if(ws.some(w=>t.includes(w))) return IC[k];return IC.cross}
 function makerShort(n){return titleCase(n).replace(/\b(Co|Ltd|Inc|Llc|Gmbh|Corporation|Corp|Limited|Company|Plc|Ag|Sa|Bv)\b\.?/gi,"").replace(/[,.]/g," ").replace(/\s+/g," ").trim()}
 function modelQ(d){const mk=makerShort(d.company_name),b=d.brand_name||"",m=d.version_or_model_number||"";const p=[];if(!b.toLowerCase().includes(mk.split(" ")[0].toLowerCase()))p.push(mk);p.push(b);if(m&&!b.toLowerCase().includes(m.toLowerCase()))p.push(m);return p.filter(Boolean).join(" ").replace(/\s+/g," ").trim()}
@@ -500,11 +514,11 @@ function buildQ(base,p,skip){const parts=["("+base+")"];
   if(skip!=="cls"&&p.cls)parts.push(`product_codes.openfda.device_class:${p.cls}`);
   if(skip!=="use"&&p.use)parts.push(p.use==="otc"?"is_otc:true":"is_rx:true");
   if(p.all!=="1")parts.push(ACTIVE);
-  return parts.join(" AND ")+(p.acc==="1"?"":EXQ)}
+  return parts.join(" AND ")+(p.acc==="1"||NOEXQ.has(base)||p.lab==="1"?"":EXQ)}
 
 /* ---------- equipment-wide stats (union of the 12 departments) ---------- */
 let _EQ=null;
-function deptQ(d){return "("+d.subs.map(s=>"("+s[2]+")").join(" OR ")+") AND "+ACTIVE+EXQ}
+function deptQ(d){return "("+d.subs.map(s=>"("+s[2]+")").join(" OR ")+") AND "+ACTIVE+(d.noExq?"":EXQ)}
 async function eqStats(){if(_EQ)return _EQ;_EQ=(async()=>{
   const per=await Promise.all(DEPTS.map(async d=>{const q=deptQ(d);const [c,g]=await Promise.all([fda({search:q,count:"company_name.exact",limit:1000}),fda({search:q,count:"gmdn_terms.name.exact",limit:1000})]);return{id:d.id,c:c.results||[],g:g.results||[]}}));
   const mk=new Map(),ty=new Set();let rec=0;per.forEach(p=>{p.c.forEach(x=>{mk.set(x.term,(mk.get(x.term)||0)+x.count);rec+=x.count});p.g.forEach(x=>ty.add(x.term))});
@@ -514,13 +528,13 @@ async function eqStats(){if(_EQ)return _EQ;_EQ=(async()=>{
 async function home(){
   app.innerHTML=`<section class="hero"><div class="wrap">
     <h1>Medical Equipment Search Engine</h1>
-    <h2>Market-ready equipment from global biomedical manufacturers, in one place</h2>
+    <h2>Market-ready equipment, reagents and consumables from global manufacturers, in one place</h2>
     <form class="bigsearch" onsubmit="event.preventDefault();go('#/search?q='+encodeURIComponent(this.q.value))">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
       <input name="q" placeholder="Search equipment, manufacturers, brands and models" autocomplete="off">
       <a class="mode" href="#/planner">🏥 Facility planner</a></form>
-    <div class="hints">Try <a href="#/search?q=patient%20monitor">patient monitor</a><a href="#/search?q=mindray">Mindray</a><a href="#/search?q=oxygen%20concentrator">oxygen concentrator</a><a href="#/search?q=autoclave">autoclave</a><a href="#/search?q=infant%20incubator">infant incubator</a></div>
-    <div class="stats"><div><b id="st-m">…</b><span>Manufacturers</span></div><div><b id="st-e">…</b><span>Equipment records</span></div><div><b id="st-t">…</b><span>Device types</span></div></div>
+    <div class="hints">Try <a href="#/search?q=patient%20monitor">patient monitor</a><a href="#/search?q=mindray">Mindray</a><a href="#/search?q=oxygen%20concentrator">oxygen concentrator</a><a href="#/search?q=autoclave">autoclave</a><a href="#/search?q=infant%20incubator">infant incubator</a><a href="#/search?q=malaria%20rapid%20test">malaria rapid test</a></div>
+    <div class="stats"><div><b id="st-m">…</b><span>Manufacturers</span></div><div><b id="st-e">…</b><span>Products listed</span></div><div><b id="st-t">…</b><span>Device types</span></div></div>
   </div></section>
   <section class="block" style="background:#eef1f6"><div class="wrap"><div class="grid g6">${DEPTS.map(deptTile).join("")}</div></div></section>
   <section class="block"><div class="wrap center"><h2 class="sec">Equip a facility</h2><p class="sub">Pick a unit and see the essential equipment it needs. Compare options for each item and request one quotation for everything.</p>
@@ -554,7 +568,7 @@ async function home(){
   }catch(x){["st-e","st-m","st-t"].forEach(i=>{const el=document.getElementById(i);if(el)el.textContent="—"})}
 }
 const feat=(i,h,p)=>`<div class="card feat"><div class="fi">${i}</div><div><h3>${h}</h3><p>${p}</p></div></div>`;
-const deptTile=d=>`<a class="tile" href="#/c/${d.id}"><span class="tt">${esc(d.name)}</span><span class="art">${IC[d.id]}</span><span class="cnt">${d.subs.length} equipment types</span></a>`;
+const deptTile=d=>`<a class="tile" href="#/c/${d.id}"><span class="tt">${esc(d.name)}</span><span class="art">${IC[d.id]}</span><span class="cnt">${d.subs.length} ${d.noExq?"product types":"equipment types"}</span></a>`;
 const unitCard=u=>`<a class="card unit" href="#/planner/${u.id}"><span class="ui">${IC[u.icon]}</span><span><b>${esc(u.name)}</b><span>${u.items.length} essential items</span></span></a>`;
 
 function equipment(){
@@ -568,7 +582,7 @@ async function dept(id){
   app.innerHTML=`<div class="ph"><div class="wrap"><div class="crumbs"><a href="#/">Home</a> / <a href="#/equipment">Equipment</a> / ${esc(d.name)}</div><h1>${esc(d.name)}</h1><p class="desc">${esc(d.desc)} Choose a category to search and compare.</p></div></div>
   <section class="block" style="padding-top:28px"><div class="wrap"><div class="grid g4">${d.subs.map(s=>`<a class="subtile" href="#/c/${d.id}/${s[0]}"><div class="img">${IC[d.id]}</div><div class="lbl"><b>${esc(s[1])}</b><span id="sc-${s[0]}">${esc(s[3])}</span></div></a>`).join("")}</div>
   <div class="card" style="margin-top:24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px"><b>Not sure what you need?</b><br><span class="note">Our biomedical engineers can recommend equipment for your facility, patients and budget.</span></div><button class="btn btn-r" data-act="ask">Ask an engineer</button></div></div></section>`;
-  d.subs.forEach(async s=>{try{const j=await fda({search:"("+s[2]+") AND "+ACTIVE+EXQ,count:"company_name.exact",limit:1000});const n=(j.results||[]).length;const el=document.getElementById("sc-"+s[0]);if(el&&n)el.textContent=`${n>=1000?"1,000+":n} manufacturers`}catch(e){}});
+  d.subs.forEach(async s=>{try{const j=await fda({search:"("+s[2]+") AND "+ACTIVE+(d.noExq?"":EXQ),count:"company_name.exact",limit:1000});const n=(j.results||[]).length;const el=document.getElementById("sc-"+s[0]);if(el&&n)el.textContent=`${n>=1000?"1,000+":n} manufacturers`}catch(e){}});
 }
 
 async function listing(opts){
@@ -582,7 +596,8 @@ async function listing(opts){
   let base;
   if(sub) base=sub.q;
   else{ base=wordsQ(p.q,true); if(!base&&!p.maker&&!p.type){document.getElementById("res").innerHTML=`<div class="empty"><p>Type the equipment you're looking for, or browse a department.</p><div class="grid g4" style="margin-top:16px">${DEPTS.slice(0,8).map(deptTile).join("")}</div></div>`;document.getElementById("filters").innerHTML="";return}
-    if(!base) base="_exists_:brand_name"; }
+    if(!base) base="_exists_:brand_name";
+    if(p.q&&/\b(reagents?|rapid|tests?|kits?|assays?|controls?|calibrators?|tubes?|pipettes?|media|medium|agar|stains?|elisa|pcr|serology|strips?|consumables?|cuvettes?|slides?)\b/i.test(p.q))p.lab="1"; }
   try{
     const sort=p.sort==="new"?{sort:"publish_date:desc"}:{};
     let j=await fda({search:buildQ(base,p),limit:PER,skip:page*PER,...sort});
@@ -710,11 +725,12 @@ async function devExtras(d,kno){
 async function maker(name){
   app.innerHTML=`<div class="wrap">${loading("Loading manufacturer…")}</div>`;const nm=name.replace(/"/g,"");
   try{const s=`company_name.exact:"${nm}" AND ${ACTIVE}`;
-    const [eq,all,types,first]=await Promise.all([fda({search:s+EXQ,limit:1}),fda({search:s,limit:1}),fda({search:s+EXQ,count:"gmdn_terms.name.exact",limit:60}),fda({search:`company_name.exact:"${nm}"`,limit:1})]);
+    const RQ="("+DEPT.reagents.subs.map(x=>"("+x[2]+")").join(" OR ")+")";
+    const [eq,all,types,first,rg]=await Promise.all([fda({search:s+EXQ,limit:1}),fda({search:s,limit:1}),fda({search:s+EXQ,count:"gmdn_terms.name.exact",limit:60}),fda({search:`company_name.exact:"${nm}"`,limit:1}),fda({search:s+" AND "+RQ,limit:1}).catch(()=>null)]);
     const c=(first.results?.[0]?.customer_contacts||[]).map(c=>[c.phone,c.email].filter(Boolean).map(esc).join(" · ")).filter(Boolean)[0];
     app.innerHTML=`<div class="ph"><div class="wrap"><div class="crumbs"><a href="#/">Home</a> / <a href="#/suppliers">Manufacturers</a> / ${esc(titleCase(name))}</div>
       <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:6px"><div class="av" style="width:60px;height:60px;font-size:20px;background:${avColor(name)}">${esc(initials(name))}</div>
-      <div style="flex:1;min-width:240px"><h1>${esc(titleCase(name))}</h1><p class="desc">${fmt(total(eq))} market-ready equipment records · ${fmt(total(all))} including accessories${c?` · Contact: ${c}`:""}</p></div>
+      <div style="flex:1;min-width:240px"><h1>${esc(titleCase(name))}</h1><p class="desc">${fmt(total(eq))} market-ready equipment records${total(rg)?` · <a href="#/search?maker=${encodeURIComponent(name)}&acc=1">${fmt(total(rg))} reagents &amp; consumables</a>`:""} · ${fmt(total(all))} including accessories${c?` · Contact: ${c}`:""}</p></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-p" href="#/search?maker=${encodeURIComponent(name)}">Browse &amp; filter products</a><button class="btn btn-r" onclick="openQuote({title:'Get a quote',label:'Equipment from ${esc(titleCase(name)).replace(/'/g,"")}'})">Get a quote</button><a class="btn btn-g" id="mweb" href="#" target="_blank" rel="noopener" hidden>Website ↗</a></div></div></div></div>
       <div class="wrap" style="padding:20px 20px 60px"><div id="mcat"></div><div class="grid g2" style="margin-bottom:16px;align-items:start"><div class="card" style="grid-column:1/-1" id="msupwrap" hidden><h3 style="margin:0 0 4px">Local distributors for this brand</h3><div id="msup"></div></div><div class="card"><h3 style="margin:0 0 8px">Manufacturing sites &amp; roles</h3><div id="msites">${loading("Loading facilities…")}</div></div><div><div class="card"><h3 style="margin:0 0 8px">🇪🇺 EU registration (EUDAMED)</h3><div id="meu">${loading("Checking EUDAMED…")}</div></div><div class="card" style="margin-top:16px"><h3 style="margin:0 0 8px">🇨🇦 Canadian device licences</h3><div id="mhc">${loading("Checking Health Canada…")}</div></div></div></div>${(types.results||[]).length?`<div class="card"><h3 style="margin:0 0 12px">Equipment made by ${esc(makerShort(name))}</h3><div class="chips">${types.results.map(t=>`<a class="chip" href="#/search?maker=${encodeURIComponent(name)}&type=${encodeURIComponent(t.term)}">${esc(t.term)}<i>${t.count}</i></a>`).join("")}</div></div>`:`<div class="card">This manufacturer only lists accessories or consumables. <a href="#/search?maker=${encodeURIComponent(name)}&acc=1">View them</a>.</div>`}</div>`;
     sites(name).then(S=>{const el=document.getElementById("msites");if(el)el.innerHTML=siteTable(S,15)}).catch(()=>{});

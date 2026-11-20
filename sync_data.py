@@ -176,7 +176,15 @@ def sync_rwanda(partners):
 # Reads manufacturers' public sitemaps and product pages (respecting robots.txt) and keeps,
 # per product page: URL, title, the page's own preview image URL (not copied; displayed from
 # the manufacturer's server with attribution), and a short description excerpt.
-CATALOG_DOMAINS = ["abbott.com", "agfa.com", "ambu.com", "baxter.com", "bbraun.com", "bd.com", "beckmancoulter.com", "belimed.com", "bionetus.com", "blt.com.cn", "cardinalhealth.com", "carestream.com", "chison.com", "comen.com", "contecmed.com", "dentsplysirona.com", "diagnostics.roche.com", "draeger.com", "edan.com", "esaote.com", "fphcare.com", "freseniusmedicalcare.com", "fujifilm.com", "gehealthcare.com", "getinge.com", "global.medical.canon", "haag-streit.com", "hamilton-medical.com", "healthcare.nikon.com", "heine.com", "hillrom.com", "hologic.com", "icumedical.com", "intersurgical.com", "invacare.com", "karlstorz.com", "keelerglobal.com", "laerdal.com", "leica-microsystems.com", "masimo.com", "medtronic.com", "midmark.com", "mindray.com", "natus.com", "nihonkohden.com", "nipro-group.com", "olympus-global.com", "penlon.com", "philips.com", "planmeca.com", "resmed.com", "samsunghealthcare.com", "schiller.ch", "siemens-healthineers.com", "siui.com", "sonoscape.com", "spacelabshealthcare.com", "steris.com", "stryker.com", "sysmex.com", "topconhealthcare.com", "tuttnauer.com", "vyaire.com", "wdm.com.cn", "yuwell.com", "zeiss.com", "zoll.com"]
+def _maker_domains():
+    try:
+        m = re.search(r"const MAKER_SITES=(\{.*?\});", open("index.html", encoding="utf-8").read())
+        return sorted(set(re.findall(r':"([^"]+)"', m.group(1))))
+    except Exception:
+        return []
+
+
+CATALOG_DOMAINS = _maker_domains()
 BOT_UA = "CreamBiomedBot/1.0 (+https://creambiomedscientific.com/#/about)"
 PER_RUN = 250          # new or refreshed pages per domain per run
 REFRESH_DAYS = 30

@@ -12,7 +12,7 @@ const html = fs.readFileSync("index.html", "utf8");
 // ---- pull shared definitions from index.html
 const grab = (re) => { const m = html.match(re); if (!m) throw new Error("index.html missing " + re); return m[0]; };
 const defs = [
-  grab(/const ACTIVE=[^\n]+/), grab(/const EXQ=[^\n]+/), grab(/const G=[^\n]+/),
+  grab(/const ACTIVE=[^\n]+/), grab(/const EXQ=[^\n]+/), grab(/const RNC=[^\n]+/), grab(/const G=[^\n]+/),
   grab(/const DEPTS=\[[\s\S]*?\n\];/), grab(/const LEGAL=[^\n]+/), grab(/function normName[^\n]+/), grab(/const MAKER_SITES=[^\n]+/),
 ].join("\n");
 const { ACTIVE, EXQ, DEPTS, normName, MAKER_SITES } = new Function(defs + "\nreturn {ACTIVE,EXQ,DEPTS,normName,MAKER_SITES};")();
@@ -101,7 +101,7 @@ async function main() {
   const subInfo = {};
   for (const dept of DEPTS) for (const [id, name, q, sdesc] of dept.subs) {
     subInfo[id] = { id, name, desc: sdesc, dept, products: [], makers: [] };
-    const search = `(${q}) AND ${ACTIVE}${EXQ}`;
+    const search = `(${q}) AND ${ACTIVE}${dept.noExq ? "" : EXQ}`;
     let got = 0;
     for (let skip = 0; skip < PER_SUB && skip < 25000; skip += 100) {
       const j = await fda({ search, limit: 100, skip });
