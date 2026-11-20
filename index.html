@@ -120,6 +120,15 @@ p.sub{color:var(--mut);margin:0 0 28px}
 .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:14px;color:var(--ink)}
 .chip:hover{border-color:var(--blue);color:var(--blue);text-decoration:none}
 .chip i{font-style:normal;color:var(--mut);margin-left:4px}
+.docrow{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-top:10px;color:var(--ink);background:#fff;transition:.15s}
+.docrow:hover{border-color:var(--blue);text-decoration:none;background:var(--blue-l)}
+.docrow .di{font-size:22px;width:30px;text-align:center}
+.docrow b{display:block;font-size:15px}
+.docrow small{color:var(--mut);font-size:13px}
+.docrow .go{margin-left:auto;color:var(--blue);font-weight:700}
+.photo-cta{display:flex;gap:16px;align-items:center;background:linear-gradient(135deg,var(--blue-l),#fff);border:1px solid #d5ddf7;border-radius:var(--r);padding:18px;margin-top:16px;flex-wrap:wrap}
+.photo-cta .pi{font-size:34px}
+.photo-cta div{flex:1;min-width:200px}
 
 /* forms / modal */
 .form label{display:block;font-size:14px;font-weight:600;margin:14px 0 6px}
@@ -162,6 +171,7 @@ footer .disc{border-top:1px solid rgba(255,255,255,.12);margin-top:28px;padding-
     <nav>
       <a href="#/search" data-r="search">Find equipment</a>
       <a href="#/categories" data-r="categories">Categories</a>
+      <a href="#/manuals" data-r="manuals">Manuals</a>
       <a href="#/services" data-r="services">Our services</a>
       <a href="#/list" data-r="list">For manufacturers</a>
       <a href="#/about" data-r="about">About</a>
@@ -182,7 +192,7 @@ footer .disc{border-top:1px solid rgba(255,255,255,.12);margin-top:28px;padding-
       </div>
       <div>
         <h4>Explore</h4>
-        <p><a href="#/search">Find equipment</a><br><a href="#/categories">Categories</a><br><a href="#/services">Our services</a></p>
+        <p><a href="#/search">Find equipment</a><br><a href="#/categories">Categories</a><br><a href="#/manuals">Manuals</a><br><a href="#/services">Our services</a></p>
       </div>
       <div>
         <h4>Partners</h4>
@@ -287,6 +297,26 @@ function devIcon(d){
   for(const [,k,i] of CATS){ if(t.includes(k.split(" ")[0])) return i; }
   return "🏥";
 }
+const gq = q => "https://www.google.com/search?q="+encodeURIComponent(q);
+const gimg = q => gq(q)+"&tbm=isch";
+function makerShort(n){ return titleCase(n).replace(/\b(Co|Ltd|Inc|Llc|Gmbh|Corporation|Corp|Limited|Company|Plc|Ag|Sa|Bv)\b\.?/gi,"").replace(/[,.]/g," ").replace(/\s+/g," ").trim(); }
+function modelQ(d){
+  const mk=makerShort(d.company_name), b=d.brand_name||"", m=d.version_or_model_number||"";
+  const parts=[]; if(!b.toLowerCase().includes(mk.split(" ")[0].toLowerCase())) parts.push(mk);
+  parts.push(b); if(m && !b.toLowerCase().includes(m.toLowerCase())) parts.push(m);
+  return parts.filter(Boolean).join(" ").replace(/\s+/g," ").trim();
+}
+function k510pdf(n){ const m=/^K(\d{2})\d{4}$/i.exec(n||""); return m && +m[1]>=2 && +m[1]<70 ? `https://www.accessdata.fda.gov/cdrh_docs/pdf${+m[1]}/${n.toUpperCase()}.pdf` : null; }
+function docLinks(mq, generic){
+  const L=[
+    ["📘","User / operator manual","PDF manuals for this model",gq(`${mq} user manual filetype:pdf`)],
+    ["🔧","Service manual","Repair, calibration & troubleshooting",gq(`${mq} service manual filetype:pdf`)],
+    ["📄","Brochure & datasheet","Specifications from the manufacturer",gq(`${mq} datasheet OR brochure OR specifications filetype:pdf`)],
+    ["🛠️","Biomedical engineering resources","Service manuals shared by biomed engineers",gq(`${generic||mq} service manual site:frankshospitalworkshop.com`)],
+    ["📚","Manual libraries","Search ManualsLib for this equipment",gq(`${mq} site:manualslib.com`)]
+  ];
+  return L.map(([i,t,s,u])=>`<a class="docrow" href="${u}" target="_blank" rel="noopener"><span class="di">${i}</span><span><b>${t}</b><small>${s}</small></span><span class="go">↗</span></a>`).join("");
+}
 function primaryDI(d){ return (d.identifiers||[]).find(i=>i.type==="Primary")?.id || d.identifiers?.[0]?.id || ""; }
 function subLink(s){
   const n=s.submission_number||""; if(!n) return "";
@@ -377,6 +407,10 @@ async function home(){
       <div class="card step"><div class="n">3</div><h3>Install &amp; maintain</h3><p>Our biomedical engineers handle installation, user training and preventive maintenance so the equipment keeps working.</p></div>
     </div>
   </div></section>
+  <section class="block" style="padding-bottom:0"><div class="wrap"><div class="grid g2">
+    <a class="card" href="#/manuals" style="color:var(--ink);text-decoration:none;display:flex;gap:16px;align-items:center"><span style="font-size:36px">📘</span><span><b style="font-size:18px">Service &amp; user manuals</b><br><span class="note">Find operator manuals, service manuals and datasheets for any model.</span></span></a>
+    <a class="card" href="javascript:openQuote({label:'Service / repair',extra:'Request: service, repair or calibration'})" style="color:var(--ink);text-decoration:none;display:flex;gap:16px;align-items:center"><span style="font-size:36px">🔧</span><span><b style="font-size:18px">Service &amp; repair</b><br><span class="note">Book our biomedical engineers for maintenance, calibration or repair.</span></span></a>
+  </div></div></section>
   <section class="block"><div class="wrap">
     <div class="band"><div><h2>Are you a manufacturer or distributor?</h2><p>List your products and reach hospitals, clinics and laboratories looking for equipment.</p></div>
     <a class="btn btn-g" href="#/list">List your products</a></div>
@@ -428,7 +462,7 @@ function devCard(d){
     <div class="mk">by <a href="#/maker/${encodeURIComponent(d.company_name)}">${esc(titleCase(d.company_name))}</a>${g?` · <span style="color:var(--mut)">${esc(g)}</span>`:""}</div>
     ${d.device_description?`<p class="desc">${esc(d.device_description)}</p>`:""}
     <div class="tags">${regTags(d)}</div></div>
-    <div class="act"><a class="btn btn-g btn-sm" href="#/device/${encodeURIComponent(d.public_device_record_key)}">Details</a>${quoteBtn(d)}</div></div>`;
+    <div class="act"><a class="btn btn-g btn-sm" href="${gimg(modelQ(d))}" target="_blank" rel="noopener">📷 Photos</a><a class="btn btn-g btn-sm" href="#/device/${encodeURIComponent(d.public_device_record_key)}">Details &amp; manuals</a>${quoteBtn(d)}</div></div>`;
 }
 
 async function device(key){
@@ -436,7 +470,7 @@ async function device(key){
   try{
     const j=await fda({search:`public_device_record_key:"${key.replace(/"/g,"")}"`,limit:1});
     const d=j.results?.[0]; if(!d){ app.innerHTML=`<div class="wrap empty"><p>Device not found.</p><a href="#/search">Back to search</a></div>`; return; }
-    const g=d.gmdn_terms?.[0], pc=d.product_codes?.[0], di=primaryDI(d);
+    const g=d.gmdn_terms?.[0], pc=d.product_codes?.[0], di=primaryDI(d), mq=modelQ(d);
     const rows=[
       ["Manufacturer",`<a href="#/maker/${encodeURIComponent(d.company_name)}">${esc(titleCase(d.company_name))}</a>`],
       ["Brand",esc(d.brand_name)],["Model / version",esc(d.version_or_model_number)],["Catalogue number",esc(d.catalog_number)],
@@ -458,6 +492,18 @@ async function device(key){
         <div><h1>${esc(devName(d))}</h1><div class="mk" style="color:var(--mut)">${esc(d.version_or_model_number||"")}${d.version_or_model_number?" · ":""}by ${esc(titleCase(d.company_name))}</div><div class="tags" style="margin-top:10px">${regTags(d)}</div></div></div>
         ${d.device_description?`<p style="margin:20px 0 0">${esc(d.device_description)}</p>`:""}
         ${g?.definition?`<p class="note" style="margin-top:12px"><b>What this type of device does:</b> ${esc(g.definition)}</p>`:""}
+        <div class="photo-cta"><span class="pi">📷</span><div><b>See this equipment</b><br><span class="note">Photos of the ${esc(d.version_or_model_number||devName(d))} and the manufacturer's product page.</span></div>
+          <a class="btn btn-p btn-sm" href="${gimg(mq)}" target="_blank" rel="noopener">View photos</a>
+          <a class="btn btn-g btn-sm" href="${gq(mq+" "+makerShort(d.company_name)+" official product page")}" target="_blank" rel="noopener">Manufacturer page</a></div>
+      </div>
+      <div class="card" style="margin-top:16px" id="manuals"><h3 style="margin:0 0 4px">Manuals &amp; documents</h3>
+        <p class="note" style="margin:0">User and service manuals for the ${esc(mq)}. Documents are owned by the manufacturer and open on their original sites.</p>
+        ${k510pdf((d.premarket_submissions||[]).map(s=>s.submission_number).find(n=>/^K/i.test(n||"")))?`<a class="docrow" href="${k510pdf((d.premarket_submissions||[]).map(s=>s.submission_number).find(n=>/^K/i.test(n||"")))}" target="_blank" rel="noopener"><span class="di">🏛️</span><span><b>FDA 510(k) clearance document</b><small>Official FDA summary: intended use, technology &amp; testing</small></span><span class="go">↗</span></a>`:""}
+        ${docLinks(mq, g?.name)}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+          <button class="btn btn-r btn-sm" onclick="openQuote({label:'Manual request: ${esc(mq).replace(/'/g,"")}',extra:'Request: user/service manual'})">Can't find it? Ask our engineers</button>
+          <button class="btn btn-g btn-sm" onclick="openQuote({label:'Service / repair: ${esc(mq).replace(/'/g,"")}',extra:'Request: service, repair or calibration'})">Book service or repair</button>
+        </div>
       </div>
       <div class="card" style="margin-top:16px"><h3 style="margin:0 0 10px">Specifications &amp; regulatory details</h3><table class="kv">${rows.map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table>
       <p class="note" style="margin:14px 0 0">Source: U.S. FDA GUDID via openFDA. FDA clearance does not mean the device is registered in your country; we can check local registration for you.</p></div>
@@ -502,6 +548,37 @@ async function maker(name){
     const list=dedupe(j.results||[]).slice(0,PER);
     document.getElementById("mk-list").innerHTML = list.length ? `<h3>Products</h3>${list.map(devCard).join("")}<p style="text-align:center"><a class="btn btn-g" href="#/search?maker=${encodeURIComponent(name)}">See all products →</a></p>` : "";
   }catch(e){ app.innerHTML=`<div class="wrap">${errBox(e)}</div>`; }
+}
+
+async function manuals(){
+  const q=(qp().q||"").trim();
+  const pop=["Mindray BeneView T5","GE Vivid","Philips IntelliVue MX450","Dräger Savina 300","Zoll AED Plus","Baxter Sigma Spectrum","Olympus CX23","Sysmex XN-550"];
+  app.innerHTML=`<section class="hero" style="background:linear-gradient(135deg,#fff,var(--blue-l))"><div class="wrap" style="padding-top:44px;padding-bottom:40px">
+    <h1 style="font-size:clamp(28px,4vw,42px)">Service &amp; user manuals</h1>
+    <p class="lead">Find operator manuals, service manuals and datasheets for medical equipment. Enter the brand and model for the best results.</p>
+    <form class="searchbox" onsubmit="event.preventDefault();go('#/manuals?q='+encodeURIComponent(this.q.value))"><input name="q" value="${esc(q)}" placeholder="e.g. Mindray BeneView T5, Dräger Savina 300, GE Logiq P5…" autocomplete="off"><button class="btn btn-p">Find manuals</button></form>
+    <div class="hints">Popular: ${pop.map(p=>`<a href="#/manuals?q=${encodeURIComponent(p)}">${esc(p)}</a>`).join("")}</div>
+  </div></section>
+  <section class="block" style="padding-top:32px"><div class="wrap"><div class="grid g2" style="gap:24px;align-items:start">
+    <div>${q?`<div class="card"><h3 style="margin:0 0 4px">Documents for “${esc(q)}”</h3><p class="note" style="margin:0">Each link opens a search on the original source. Manuals remain the property of their manufacturers.</p>${docLinks(q)}<a class="docrow" href="${gimg(q)}" target="_blank" rel="noopener"><span class="di">📷</span><span><b>Photos</b><small>See what this equipment looks like</small></span><span class="go">↗</span></a></div>
+      <div id="man-dev" style="margin-top:16px"></div>`
+      :`<div class="card"><h3 style="margin-top:0">How to find the right manual</h3><p class="note">1. Find the <b>brand and model</b> on the device's rating label (usually on the back or bottom).<br>2. Search for it above. We look for user manuals, service manuals, datasheets and FDA documents.<br>3. Service manuals are often restricted to authorised engineers. If you can't find one, ask us and we'll request it from the manufacturer or distributor.</p></div>`}
+    </div>
+    <div>
+      <div class="card"><h3 style="margin-top:0">Need help with your equipment?</h3><p class="note">Our biomedical engineers service, repair and calibrate equipment, and can get hold of service documentation from manufacturers and distributors.</p>
+        <button class="btn btn-r" style="margin-top:6px" onclick="openQuote({label:'Manual request: ${esc(q).replace(/'/g,"")}',extra:'Request: user/service manual'})">Request a manual</button>
+        <button class="btn btn-g" style="margin-top:6px" onclick="openQuote({label:'Service / repair: ${esc(q).replace(/'/g,"")}',extra:'Request: service, repair or calibration'})">Book service or repair</button></div>
+      <div class="card" style="margin-top:16px"><h3 style="margin-top:0">Useful resources</h3>
+        <a class="docrow" href="https://frankshospitalworkshop.com/" target="_blank" rel="noopener"><span class="di">🛠️</span><span><b>Frank's Hospital Workshop</b><small>Free service manuals &amp; guides for biomedical engineers</small></span><span class="go">↗</span></a>
+        <a class="docrow" href="https://www.who.int/teams/health-product-policy-and-standards/assistive-and-medical-technology/medical-devices" target="_blank" rel="noopener"><span class="di">🌍</span><span><b>WHO medical devices</b><small>Technical specifications &amp; maintenance guidance</small></span><span class="go">↗</span></a>
+        <a class="docrow" href="https://accessgudid.nlm.nih.gov/" target="_blank" rel="noopener"><span class="di">🏛️</span><span><b>AccessGUDID</b><small>Official US device identification records</small></span><span class="go">↗</span></a>
+      </div>
+    </div>
+  </div></div></section>`;
+  if(q){ const box=document.getElementById("man-dev"); box.innerHTML=loading("Matching devices…");
+    try{ const j=await fda({search:buildQuery({q,phrase:false,active:"0"}),limit:60}); const list=dedupe(j.results||[]).slice(0,8);
+      box.innerHTML=list.length?`<h3>Matching devices</h3><p class="note" style="margin-top:-6px">Open a device to see manuals for that exact model.</p>${list.map(devCard).join("")}`:"";
+    }catch(e){ box.innerHTML=""; } }
 }
 
 function services(){
@@ -563,6 +640,7 @@ function route(){
   if(seg[0]==="device"&&seg[1]) return device(decodeURIComponent(seg[1]));
   if(seg[0]==="maker"&&seg[1]) return maker(decodeURIComponent(seg.slice(1).join("/")));
   if(seg[0]==="services") return services();
+  if(seg[0]==="manuals") return manuals();
   if(seg[0]==="list") return listPage();
   if(seg[0]==="about") return about();
   home();
