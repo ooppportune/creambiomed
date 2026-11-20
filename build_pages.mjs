@@ -207,6 +207,27 @@ ${prods.length ? `<div class="card"><h2>Products</h2><ul class="list">${prods.ma
   }
   write("c/index.html", page({ title: "Medical equipment categories | Cream Biomed", desc: "Browse medical equipment by hospital department: monitoring, imaging, respiratory, surgery, emergency, maternal, laboratory, sterilisation, dental, eye & ENT, furniture and dialysis.", canon: "/c/", crumbs: `<a href="/">Home</a> / Categories`, body: (who.length ? `<div class="card"><h2><a href="/c/who.html">WHO-prequalified diagnostics</a></h2><p class="note">${who.length} malaria, HIV, hepatitis, syphilis and other tests assessed by WHO.</p></div>` : "") + DEPTS.map((dp) => `<div class="card"><h2>${esc(dp.name)}</h2><p class="note">${esc(dp.desc)}</p><ul class="list">${dp.subs.map((s) => `<li>${subLink(s[0])} <span class="note">· ${subInfo[s[0]].products.length} products</span></li>`).join("")}</ul></div>`).join("") }));
 
+  // service landing pages
+  const SV = [
+    ["repair", "Medical equipment repair & servicing", "Book biomedical engineers to diagnose, repair and service patient monitors, ultrasound, ventilators, lab analysers, autoclaves and more, from all major brands. Track your job with a reference number.", "#/repair"],
+    ["spare-parts", "Medical equipment spare parts & accessories", "Probes, SpO2 sensors, ECG cables, BP cuffs, batteries, breathing circuits and other parts by device brand and model, original or quality-tested compatible.", "#/parts"],
+    ["used-rental", "Used & rental medical equipment", "Buy, sell or hire pre-owned medical and laboratory equipment. Every listing is reviewed, and equipment can be inspected, serviced and installed by our engineers.", "#/market"],
+    ["asset-register", "Free medical equipment asset register", "Keep your facility's equipment inventory with service dates, export to Excel and get preventive maintenance reminders in your calendar.", "#/assets"],
+    ["calibration", "Medical equipment calibration & electrical safety testing", "Electrical safety testing (IEC 62353), performance verification and calibration certificates for monitors, defibrillators, infusion pumps, ventilators, autoclaves and lab equipment.", "#/calibration"],
+    ["training", "Medical equipment installation & training", "Installation and commissioning plus practical training for clinical users and in-house technicians, on site or online.", "#/training"],
+    ["import-registration", "Medical device import & registration", "Help with supplier documents, shipping, customs clearance and registration with NDA Uganda, PPB Kenya, TMDA Tanzania and Rwanda FDA.", "#/import"],
+    ["financing", "Medical equipment financing & leasing", "Compare instalment plans, leasing, rent-to-own and short-term rental options for hospitals, clinics and laboratories.", "#/finance"],
+    ["tenders", "Medical equipment tenders in East Africa", "Current tenders for medical equipment, reagents and services, with help preparing compliant, competitive bids.", "#/tenders"],
+  ];
+  for (const [sl, t, d, h] of SV) {
+    write(`services/${sl}.html`, page({ title: `${t} | Cream Biomed`, desc: d, canon: `/services/${sl}.html`, crumbs: `<a href="/">Home</a> / <a href="/services/">Services</a> / ${esc(t)}`,
+      body: `<div class="card"><h1>${esc(t)}</h1><p>${esc(d)}</p><p>Cream Biomed and Scientific Limited is a team of biomedical engineers and medical doctors serving hospitals, clinics and laboratories in Uganda and East Africa.</p><p><a class="btn btn-r" href="/${h}">Get started</a><a class="btn btn-g" href="${waLink(`Hello Cream Biomed, I'd like help with: ${t}.`)}" rel="nofollow">WhatsApp us</a></p></div><div class="card"><h2>Other services</h2><ul class="list">${SV.filter((x) => x[0] !== sl).map((x) => `<li><a href="/services/${x[0]}.html">${esc(x[1])}</a></li>`).join("")}</ul></div>` }));
+    urls.push(`/services/${sl}.html`);
+  }
+  write("services/index.html", page({ title: "One-stop medical equipment services | Cream Biomed", desc: "Sourcing, lab reagents, repair, spare parts, used and rental equipment, calibration, training, import, financing and tenders from Cream Biomed.", canon: "/services/", crumbs: `<a href="/">Home</a> / Services`,
+    body: `<div class="card"><h1>One-stop medical equipment services</h1><ul class="list">${SV.map((x) => `<li><a href="/services/${x[0]}.html">${esc(x[1])}</a></li>`).join("")}</ul></div>` }));
+  urls.push("/services/");
+
   // sitemaps (max 50k URLs each)
   const today = new Date().toISOString().slice(0, 10);
   const chunks = []; for (let i = 0; i < urls.length; i += 40000) chunks.push(urls.slice(i, i + 40000));
