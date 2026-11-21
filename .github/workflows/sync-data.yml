@@ -1,1 +1,55 @@
-{"name": "Sync regulatory data", "on": {"schedule": [{"cron": "17 2 * * *"}], "workflow_dispatch": {}}, "permissions": {"contents": "write"}, "concurrency": {"group": "sync", "cancel-in-progress": false}, "jobs": {"sync": {"runs-on": "ubuntu-latest", "timeout-minutes": 150, "steps": [{"uses": "actions/checkout@v4"}, {"uses": "actions/setup-python@v5", "with": {"python-version": "3.12"}}, {"run": "pip install pdfplumber"}, {"run": "python sync_data.py"}, {"uses": "actions/setup-node@v4", "with": {"node-version": "22"}}, {"name": "Build search-engine pages", "run": "node build_pages.mjs", "continue-on-error": true}, {"run": "git config user.name 'creambiomed-data-bot'\ngit config user.email 'actions@users.noreply.github.com'\ngit add -A\nif git diff --cached --quiet; then exit 0; fi\ngit commit -q -m 'Update regulatory data and pages'\nfor i in 1 2 3; do\n  if git pull --rebase -X theirs origin main && git push; then exit 0; fi\n  git rebase --abort || true\n  sleep 15\ndone\nexit 1"}]}}}
+{
+ "name": "Sync regulatory data",
+ "on": {
+  "schedule": [
+   {
+    "cron": "17 2 * * *"
+   }
+  ],
+  "workflow_dispatch": {}
+ },
+ "permissions": {
+  "contents": "write"
+ },
+ "concurrency": {
+  "group": "sync",
+  "cancel-in-progress": false
+ },
+ "jobs": {
+  "sync": {
+   "runs-on": "ubuntu-latest",
+   "timeout-minutes": 150,
+   "steps": [
+    {
+     "uses": "actions/checkout@v5"
+    },
+    {
+     "uses": "actions/setup-python@v6",
+     "with": {
+      "python-version": "3.12"
+     }
+    },
+    {
+     "run": "pip install pdfplumber"
+    },
+    {
+     "run": "python sync_data.py"
+    },
+    {
+     "uses": "actions/setup-node@v5",
+     "with": {
+      "node-version": "22"
+     }
+    },
+    {
+     "name": "Build search-engine pages",
+     "run": "node build_pages.mjs",
+     "continue-on-error": true
+    },
+    {
+     "run": "git config user.name 'creambiomed-data-bot'\ngit config user.email 'actions@users.noreply.github.com'\ngit add -A\nif git diff --cached --quiet; then exit 0; fi\ngit commit -q -m 'Update regulatory data and pages'\nfor i in 1 2 3; do\n  if git pull --rebase -X theirs origin main && git push; then exit 0; fi\n  git rebase --abort || true\n  sleep 15\ndone\nexit 1"
+    }
+   ]
+  }
+ }
+}
