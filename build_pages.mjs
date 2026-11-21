@@ -96,7 +96,26 @@ function write(rel, content) {
 }
 
 // ---- main
+const PRICES_CSV = (html.match(/pricesCSV:"([^"]+)"/) || [])[1] || "";
+function parseCSV(t) { const R = []; let row = [], f = "", q = false; for (let i = 0; i < t.length; i++) { const c = t[i]; if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; } else if (c === '"') q = true; else if (c === ",") { row.push(f); f = ""; } else if (c === "\n" || c === "\r") { if (c === "\r" && t[i + 1] === "\n") i++; row.push(f); R.push(row); row = []; f = ""; } else f += c; } if (f || row.length) { row.push(f); R.push(row); } return R; }
+async function loadPrices() {
+  if (!/^https/.test(PRICES_CSV)) return [];
+  try {
+    const r = await fetch(PRICES_CSV); if (!r.ok) return [];
+    const R = parseCSV(await r.text()); const h = (R.shift() || []).map((x) => x.trim().toLowerCase()); const ix = (n) => h.indexOf(n);
+    const num = (v) => { const n = Number(String(v || "").replace(/[^0-9.]/g, "")); return isFinite(n) && n > 0 ? n : null; };
+    return R.map((c) => ({ brand: c[ix("brand")] || "", model: c[ix("model")] || "", product: c[ix("product")] || "", lo: num(c[ix("price from")]), hi: num(c[ix("price to")]), cur: String(c[ix("currency")] || "").trim().toUpperCase() }))
+      .filter((p) => (p.lo || p.hi) && /^[A-Z]{3}$/.test(p.cur) && (p.model || p.product));
+  } catch { return []; }
+}
+const nb = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+function priceFor(P, d) {
+  const hay = nb([d.brand_name, d.company_name, d.version_or_model_number].join(" ")), hay2 = nb([d.brand_name, d.version_or_model_number, d.gmdn_terms?.[0]?.name].join(" "));
+  return P.find((p) => { const b = nb(p.brand); if (b && !hay.includes(b)) return false; const m = nb(p.model); if (m) return hay.includes(m); const pr = nb(p.product); return pr ? hay2.includes(pr) : false; });
+}
+
 async function main() {
+  const PRICES = await loadPrices();
   const products = new Map(); // slug -> {d, subs:Set}
   const makers = new Map(); // slug -> {name, subs: Map(subId->count), products:Set(slug)}
   const subInfo = {};
@@ -161,7 +180,12 @@ ${cat && (cat[6] || []).length ? `<div class="card"><h2>Manuals &amp; documents<
 <div class="card"><h2>Specifications &amp; regulatory details</h2><table>${rows.map((r) => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join("")}</table><p class="note">Source: U.S. FDA GUDID via openFDA. FDA clearance does not mean the device is registered in your country; Cream Biomed can check local registration for you.</p></div></div>
 <div><div class="card"><h2>Cream Biomed services</h2><ul style="padding-left:18px;margin:0"><li>Sourcing and quotations from the manufacturer or authorised distributors</li><li>Delivery, installation and commissioning</li><li>User and technical training</li><li>Preventive maintenance, repair and calibration</li><li>User and service manuals</li></ul><p><a class="btn btn-r" href="${waLink(`Hello Cream Biomed, I need help with: ${full} (${mname}).`)}" rel="nofollow">Talk to an engineer</a></p></div>
 <div class="card"><h2>More ${esc(sub.name.toLowerCase())}</h2><ul style="padding-left:18px;margin:0">${related.map((r) => `<li><a href="/p/${r}.html">${esc(products.get(r).d.brand_name || "")} ${esc(products.get(r).d.version_or_model_number || "")}</a> <span class="note">· ${esc(titleCase(products.get(r).d.company_name))}</span></li>`).join("")}</ul><p><a href="/c/${sub.id}.html">All ${esc(sub.name.toLowerCase())} →</a></p></div></div></div>`;
-    const jsonld = { "@context": "https://schema.org", "@type": "Product", name: full, brand: { "@type": "Brand", name: d.brand_name || mname }, manufacturer: { "@type": "Organization", name: mname }, model: model || undefined, category: `${sub.dept.name} > ${sub.name}`, description: d.device_description || g?.definition || undefined, gtin: /^\d{8,14}$/.test(primaryDI(d)) ? primaryDI(d) : undefined, image: cat ? cat[2] : undefined, url: `${SITE}/p/${s}.html` };
+    const pr = priceFor(PRICES, d);
+    const offers = pr ? { "@type": "AggregateOffer", priceCurrency: pr.cur, lowPrice: pr.lo || pr.hi, highPrice: pr.hi || pr.lo, offerCount: 1, availability: "https://schema.org/InStock", seller: { "@type": "Organization", name: "Cream Biomed and Scientific Limited" } } : undefined;
+    // Google's product snippets need a real offer, review or rating; without a quoted price the page is described as a medical device instead.
+    const jsonld = pr
+      ? { "@context": "https://schema.org", "@type": "Product", name: full, brand: { "@type": "Brand", name: d.brand_name || mname }, manufacturer: { "@type": "Organization", name: mname }, model: model || undefined, category: `${sub.dept.name} > ${sub.name}`, description: d.device_description || g?.definition || undefined, gtin: /^\d{8,14}$/.test(primaryDI(d)) ? primaryDI(d) : undefined, image: cat ? cat[2] : undefined, url: `${SITE}/p/${s}.html`, offers }
+      : { "@context": "https://schema.org", "@type": "MedicalDevice", name: full, description: d.device_description || g?.definition || undefined, image: cat ? cat[2] : undefined, url: `${SITE}/p/${s}.html`, relevantSpecialty: sub.dept.name };
     write(`p/${s}.html`, page({ title, desc, canon: `/p/${s}.html`, crumbs: `<a href="/">Home</a> / <a href="/c/">Categories</a> / ${subLink(sub.id)} / ${esc(full)}`, body, jsonld }));
     urls.push(`/p/${s}.html`);
   }
